@@ -472,6 +472,55 @@ async def marketplace_packs(
     return {"packs": enriched}
 
 
+@api.get("/marketplace/packs/{pack_id}")
+async def marketplace_pack_detail(pack_id: str, user: dict = Depends(get_current_user)):
+    pack = await db.submission_packs.find_one({"id": pack_id, "status": "published"}, {"_id": 0})
+    if not pack:
+        raise HTTPException(status_code=404, detail="Pack not available")
+    company = await db.companies.find_one({"id": pack["cedente_company_id"]}, {"_id": 0, "verified": 1, "country": 1})
+    is_verified = bool(company and company.get("verified"))
+    broker_name = None
+    if pack.get("broker_id"):
+        bu = await db.users.find_one({"id": pack["broker_id"]}, {"_id": 0})
+        if bu and bu.get("company_id"):
+            bc = await db.companies.find_one({"id": bu["company_id"]}, {"_id": 0, "name": 1})
+            if bc:
+                broker_name = bc.get("name")
+    interests_count = await db.interests.count_documents({"pack_id": pack["id"]})
+    own_interest = None
+    if user["role"] == "reasegurador":
+        mi = await db.interests.find_one({"pack_id": pack["id"], "reasegurador_user_id": user["id"]}, {"_id": 0})
+        if mi:
+            own_interest = mi.get("status")
+    avg_lr = round(((pack.get("loss_ratio_y1") or 0) + (pack.get("loss_ratio_y2") or 0) + (pack.get("loss_ratio_y3") or 0)) / 3, 1)
+    return {
+        "pack": {
+            "id": pack["id"],
+            "code": pack["code"],
+            "title": pack["title"],
+            "branch": pack["branch"],
+            "reinsurance_type": pack["reinsurance_type"],
+            "country_region": pack.get("country_region"),
+            "coverage_period": pack.get("coverage_period"),
+            "cession_pct": pack.get("cession_pct"),
+            "premiums_y1": pack.get("premiums_y1"),
+            "premiums_y2": pack.get("premiums_y2"),
+            "premiums_y3": pack.get("premiums_y3"),
+            "loss_ratio_y1": pack.get("loss_ratio_y1"),
+            "loss_ratio_y2": pack.get("loss_ratio_y2"),
+            "loss_ratio_y3": pack.get("loss_ratio_y3"),
+            "avg_loss_ratio": avg_lr,
+            "description": pack.get("description"),
+            "verified": is_verified,
+            "cedente_country": company.get("country") if company else None,
+            "broker_name": broker_name,
+            "interests_count": interests_count,
+            "own_interest": own_interest,
+            "published_at": pack.get("published_at"),
+        }
+    }
+
+
 # ─── Interests ───────────────────────────────────────────────────────────
 @api.post("/interests")
 async def express_interest(payload: InterestIn, request: Request, user: dict = Depends(require_role("reasegurador"))):
@@ -1221,6 +1270,61 @@ async def on_startup():
                 "website_url": "https://aon-demo.com",
                 "updated_at": now_iso(),
             })
+
+    # Seed demo Submission Packs so the marketplace is never empty
+    cedente_user = await db.users.find_one({"email": "cedente@demo.eu"})
+    if cedente_user:
+        existing_pack = await db.submission_packs.find_one({"cedente_user_id": cedente_user["id"]})
+        if not existing_pack:
+            demo_packs = [
+                {
+                    "title": "XL Property Cat España 2026",
+                    "branch": "Property",
+                    "reinsurance_type": "Excess of Loss",
+                    "country_region": "España",
+                    "coverage_period": "01/01/2026 – 31/12/2026",
+                    "cession_pct": 30,
+                    "premiums_y1": 15000000, "premiums_y2": 13500000, "premiums_y3": 12800000,
+                    "loss_ratio_y1": 62, "loss_ratio_y2": 58, "loss_ratio_y3": 65,
+                    "description": "Cartera Property Cat diversificada en Península Ibérica. Exposición principal Cataluña, Madrid y Valencia. Sin siniestros catastróficos en últimos 5 años. Retención de 2M€ por siniestro. Programa renovado anualmente, busca reasegurador estable con rating mínimo A.",
+                    "broker_id": None,
+                },
+                {
+                    "title": "Quota Share Motor Flota Iberia",
+                    "branch": "Motor",
+                    "reinsurance_type": "Quota Share",
+                    "country_region": "España · Portugal",
+                    "coverage_period": "01/04/2026 – 31/03/2027",
+                    "cession_pct": 40,
+                    "premiums_y1": 42000000, "premiums_y2": 39000000, "premiums_y3": 36500000,
+                    "loss_ratio_y1": 71, "loss_ratio_y2": 68, "loss_ratio_y3": 74,
+                    "description": "Quota share proporcional sobre cartera de flotas corporativas en Iberia. 350.000 vehículos. Comisión de cesión objetivo 27-30%.",
+                    "broker_id": broker_user["id"] if broker_user else None,
+                },
+                {
+                    "title": "Surplus Ingeniería Construcción 2026",
+                    "branch": "Ingeniería",
+                    "reinsurance_type": "Surplus",
+                    "country_region": "Europa Occidental",
+                    "coverage_period": "01/01/2026 – 31/12/2026",
+                    "cession_pct": 50,
+                    "premiums_y1": 8500000, "premiums_y2": 7200000, "premiums_y3": 6900000,
+                    "loss_ratio_y1": 54, "loss_ratio_y2": 49, "loss_ratio_y3": 61,
+                    "description": "Cartera de Construction All Risks (CAR) y Erection All Risks (EAR) en proyectos medianos. Capacidad media 40M€ por riesgo.",
+                    "broker_id": None,
+                },
+            ]
+            for dp in demo_packs:
+                await db.submission_packs.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "code": anon_code(),
+                    "cedente_user_id": cedente_user["id"],
+                    "cedente_company_id": cedente_user["company_id"],
+                    "status": "published",
+                    "created_at": now_iso(),
+                    "published_at": now_iso(),
+                    **dp,
+                })
 
 
 app.include_router(api)

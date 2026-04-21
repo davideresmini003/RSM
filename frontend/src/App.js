@@ -13,6 +13,7 @@ import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import NewPack from "./pages/NewPack";
 import Marketplace from "./pages/Marketplace";
+import SubmissionPackDetail from "./pages/SubmissionPackDetail";
 import OperationsList from "./pages/OperationsList";
 import OperationDetail from "./pages/OperationDetail";
 import BrokersMarketplace from "./pages/BrokersMarketplace";
@@ -76,6 +77,9 @@ function App() {
             } />
             <Route path="/app/marketplace" element={
               <Protected><NeedsOnboarding><AppLayout><Marketplace /></AppLayout></NeedsOnboarding></Protected>
+            } />
+            <Route path="/app/marketplace/:id" element={
+              <Protected><NeedsOnboarding><AppLayout><SubmissionPackDetail /></AppLayout></NeedsOnboarding></Protected>
             } />
             <Route path="/app/operations" element={
               <Protected><NeedsOnboarding><AppLayout><OperationsList /></AppLayout></NeedsOnboarding></Protected>

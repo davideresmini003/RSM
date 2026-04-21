@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { api } from "../lib/api";
 import { useI18n } from "../lib/i18n";
-import { useAuth } from "../lib/auth";
 import { PackCard } from "./Dashboard";
 import { Search } from "lucide-react";
 
@@ -10,11 +9,9 @@ const TYPES = ["", "Excess of Loss", "Quota Share", "Surplus", "Proporcional", "
 
 export default function Marketplace() {
   const { t } = useI18n();
-  const { user } = useAuth();
   const [packs, setPacks] = useState([]);
   const [filters, setFilters] = useState({ branch: "", reinsurance_type: "", country: "", verified_only: false, has_broker: "all", search: "" });
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState({ open: false, pack: null, message: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,16 +28,6 @@ export default function Marketplace() {
     } finally { setLoading(false); }
   }, [filters]);
   useEffect(() => { load(); }, [load]);
-
-  const expressInterest = async () => {
-    try {
-      await api.post("/interests", { pack_id: msg.pack.id, message: msg.message });
-      setMsg({ open: false, pack: null, message: "" });
-      load();
-    } catch (e) {
-      alert(e.response?.data?.detail || e.message);
-    }
-  };
 
   return (
     <div className="p-8 max-w-7xl mx-auto" data-testid="marketplace-page">
@@ -92,38 +79,11 @@ export default function Marketplace() {
             <div className="text-center py-12 text-slate-400 text-sm">{t("marketplace.no_results")}</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {packs.map((p) => (
-                <div key={p.id} className="relative">
-                  <PackCard p={p} />
-                  {user?.role === "reasegurador" && !p.own_interest && (
-                    <button
-                      onClick={(e) => { e.preventDefault(); setMsg({ open: true, pack: p, message: "" }); }}
-                      className="absolute bottom-4 right-4 rsm-btn-primary text-xs"
-                      data-testid={`express-${p.id}`}
-                    >{t("marketplace.express_interest")}</button>
-                  )}
-                </div>
-              ))}
+              {packs.map((p) => <PackCard key={p.id} p={p} />)}
             </div>
           )}
         </div>
       </div>
-
-      {msg.open && (
-        <div className="fixed inset-0 bg-[#0B132B]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setMsg({ open: false, pack: null, message: "" })}>
-          <div className="bg-white border-2 border-[#0B132B] max-w-lg w-full p-8" style={{ boxShadow: "8px 8px 0 #0B132B" }} onClick={(e) => e.stopPropagation()}>
-            <div className="overline">Expresar interés</div>
-            <h3 className="font-display text-2xl font-semibold mt-1">{msg.pack?.code}</h3>
-            <p className="text-sm text-slate-600 mt-2">{msg.pack?.title}</p>
-            <label className="rsm-label mt-6">Mensaje (opcional, máx. 500)</label>
-            <textarea className="rsm-input" rows={4} maxLength={500} value={msg.message} onChange={(e) => setMsg({ ...msg, message: e.target.value })} data-testid="interest-message" />
-            <div className="mt-6 flex justify-end gap-3">
-              <button className="rsm-btn-outline" onClick={() => setMsg({ open: false, pack: null, message: "" })}>{t("common.cancel")}</button>
-              <button className="rsm-btn-primary" onClick={expressInterest} data-testid="confirm-interest">{t("marketplace.express_interest")}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
