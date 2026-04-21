@@ -1,10 +1,24 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
-import { ShieldCheck, Fingerprint, FileClock, Lock, ArrowRight, Building2, Languages } from "lucide-react";
+import { useAuth } from "../lib/auth";
+import { DEMO_ACCOUNTS, quickLogin } from "../lib/demoAccess";
+import { ShieldCheck, Fingerprint, FileClock, Lock, ArrowRight, Building2, Languages, Zap } from "lucide-react";
 
 export default function Landing() {
   const { t, lang, setLang } = useI18n();
+  const { refresh } = useAuth();
+  const navigate = useNavigate();
+
+  const enterAs = async (role) => {
+    try {
+      await quickLogin(role);
+      await refresh();
+      navigate(role === "admin" ? "/app/admin" : "/app");
+    } catch (e) {
+      alert("No se pudo iniciar sesión demo: " + (e.response?.data?.detail || e.message));
+    }
+  };
 
   return (
     <div className="bg-white text-[#0B132B]" data-testid="landing-page">
@@ -25,9 +39,9 @@ export default function Landing() {
             <Link to="/login" className="text-sm font-semibold uppercase tracking-wider text-slate-600 hover:text-[#0B132B]" data-testid="nav-login">
               {t("common.login")}
             </Link>
-            <Link to="/register" className="rsm-btn-primary text-xs" data-testid="nav-register">
-              {t("landing.cta_primary")}
-            </Link>
+            <button onClick={() => enterAs("admin")} className="rsm-btn-primary text-xs" data-testid="nav-admin">
+              Admin
+            </button>
           </nav>
         </div>
       </header>
@@ -48,12 +62,24 @@ export default function Landing() {
             <p className="mt-8 text-lg sm:text-xl text-slate-300 max-w-2xl leading-relaxed">
               {t("landing.hero_sub")}
             </p>
-            <div className="mt-10 flex flex-wrap gap-4">
-              <Link to="/register" className="bg-[#D32F2F] hover:bg-[#b71c1c] text-white px-8 py-4 text-sm font-semibold uppercase tracking-wider transition-colors" data-testid="hero-cta-primary">
-                {t("landing.cta_primary")} <ArrowRight size={14} className="inline ml-2" strokeWidth={2} />
-              </Link>
-              <Link to="/login" className="border border-slate-400 hover:border-white text-white px-8 py-4 text-sm font-semibold uppercase tracking-wider transition-colors" data-testid="hero-cta-secondary">
-                {t("landing.cta_secondary")}
+            <div className="mt-10 inline-flex flex-col gap-4 p-6 bg-black/30 border border-slate-700 max-w-2xl">
+              <div className="overline text-slate-400 flex items-center gap-2"><Zap size={12} strokeWidth={2} /> Demo · acceso directo sin registro</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border-l border-t border-slate-700">
+                {DEMO_ACCOUNTS.map((a) => (
+                  <button
+                    key={a.role}
+                    onClick={() => enterAs(a.role)}
+                    className="border-r border-b border-slate-700 px-4 py-4 text-left hover:bg-[#D32F2F] transition-colors group"
+                    data-testid={`enter-as-${a.role}`}
+                  >
+                    <div className="overline text-slate-400 group-hover:text-white transition-colors">Entrar como</div>
+                    <div className="font-display text-lg font-semibold mt-1">{a.label}</div>
+                    <div className="text-[10px] text-slate-500 group-hover:text-slate-200 mt-0.5 truncate">{a.company}</div>
+                  </button>
+                ))}
+              </div>
+              <Link to="/login" className="overline text-slate-400 hover:text-white flex items-center gap-2 transition-colors" data-testid="hero-cta-secondary">
+                ¿Tienes una cuenta real? Iniciar sesión <ArrowRight size={12} strokeWidth={2} />
               </Link>
             </div>
           </div>
@@ -151,13 +177,13 @@ export default function Landing() {
                   <div className={`text-sm ${p.highlighted ? "text-slate-400" : "text-slate-500"}`}>{t("landing.per_month")}</div>
                 </div>
                 <p className={`mt-6 text-sm leading-relaxed flex-1 ${p.highlighted ? "text-slate-300" : "text-slate-600"}`}>{p.desc}</p>
-                <Link
-                  to={`/register?role=${p.role}`}
+                <button
+                  onClick={() => enterAs(p.role)}
                   className={`mt-8 text-center py-3 text-xs font-semibold uppercase tracking-wider ${p.highlighted ? "bg-[#D32F2F] text-white hover:bg-[#b71c1c]" : "bg-[#0B132B] text-white hover:bg-[#1a2447]"} transition-colors`}
                   data-testid={`pricing-cta-${p.role}`}
                 >
-                  {t("landing.start_trial")}
-                </Link>
+                  Entrar como {p.role}
+                </button>
               </div>
             ))}
           </div>
