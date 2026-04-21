@@ -51,3 +51,13 @@ See /app/memory/test_credentials.md
 - [ ] Run testing agent end-to-end (cedente publica → reasegurador interés → NCA → cotización → contrato → rating)
 - [ ] Decide on file upload storage (local GridFS vs Cloudinary/S3)
 - [ ] Add payment integration for trial → paid conversion
+
+## Testing status (Apr 21, 2026)
+- ✅ **Backend: 45/45 tests pass (100%)** — comprehensive pytest suite at /app/backend/tests/backend_test.py covering full lifecycle + negative cases
+- ✅ **Frontend: 100%** — all critical flows verified via playwright
+- ✅ **Bugs fixed in iteration_1:**
+  - Dashboard stale-state on role switch (added `user?.id` deps to useEffect in Dashboard/OperationsList/Messages)
+  - `accept_quote` double-call guard (returns 400 "Quote already accepted")
+  - `sign_contract` double-sign guard for both parties (returns 400 "Already signed")
+  - Added audit_log indexes on action and user_id
+- ✅ **Full flow verified end-to-end**: landing → quick-login as cedente → publish pack → switch to reasegurador → view pack detail → express interest → switch to cedente → accept interest → sign NCA → switch to reasegurador → sign NCA (identity revealed) → chat works bilaterally → submit quote → switch to cedente → accept quote → sign contract → switch to reasegurador → sign contract → state = closed
