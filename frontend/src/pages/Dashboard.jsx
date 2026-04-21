@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -13,8 +13,10 @@ export default function Dashboard() {
   const nav = useNavigate();
 
   useEffect(() => {
+    if (!user) return;
+    setStats(null);
     api.get("/stats/dashboard").then(({ data }) => setStats(data));
-  }, []);
+  }, [user?.id]);
 
   if (!user) return null;
   const role = user.role;
@@ -33,26 +35,26 @@ export default function Dashboard() {
         )}
       </div>
 
-      {role === "cedente" && <CedenteDashboard stats={stats} />}
-      {role === "reasegurador" && <ReaseguradorDashboard stats={stats} nav={nav} />}
-      {role === "broker" && <BrokerDashboard stats={stats} />}
+      {role === "cedente" && <CedenteDashboard stats={stats} userId={user.id} />}
+      {role === "reasegurador" && <ReaseguradorDashboard stats={stats} nav={nav} userId={user.id} />}
+      {role === "broker" && <BrokerDashboard stats={stats} userId={user.id} />}
       {role === "admin" && <AdminDashboard stats={stats} />}
     </div>
   );
 }
 
-function CedenteDashboard({ stats }) {
+function CedenteDashboard({ stats, userId }) {
   const { t } = useI18n();
   const [packs, setPacks] = useState([]);
   const [interests, setInterests] = useState([]);
   const [ops, setOps] = useState([]);
 
-  const load = () => {
+  const load = useCallback(() => {
     api.get("/submission-packs/mine").then(({ data }) => setPacks(data.packs || []));
     api.get("/interests/received?status=pending").then(({ data }) => setInterests(data.items || []));
     api.get("/operations").then(({ data }) => setOps((data.operations || []).slice(0, 3)));
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load, userId]);
 
   const publish = async (id) => {
     try { await api.put(`/submission-packs/${id}/status`, { status: "published" }); load(); } catch (e) { alert(e.response?.data?.detail || e.message); }
@@ -141,12 +143,12 @@ function CedenteDashboard({ stats }) {
   );
 }
 
-function ReaseguradorDashboard({ stats, nav }) {
+function ReaseguradorDashboard({ stats, nav, userId }) {
   const { t } = useI18n();
   const [packs, setPacks] = useState([]);
   useEffect(() => {
-    api.get("/marketplace/packs").then(({ data }) => setPacks(data.packs.slice(0, 3)));
-  }, []);
+    api.get("/marketplace/packs").then(({ data }) => setPacks((data.packs || []).slice(0, 3)));
+  }, [userId]);
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-0 border-l border-t border-[hsl(var(--border))] mb-10">
@@ -166,12 +168,12 @@ function ReaseguradorDashboard({ stats, nav }) {
   );
 }
 
-function BrokerDashboard({ stats }) {
+function BrokerDashboard({ stats, userId }) {
   const { t } = useI18n();
   const [sols, setSols] = useState([]);
   useEffect(() => {
     api.get("/solicitudes/broker").then(({ data }) => setSols((data.items || []).filter((s) => s.status === "pending").slice(0, 3)));
-  }, []);
+  }, [userId]);
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-0 border-l border-t border-[hsl(var(--border))] mb-10">

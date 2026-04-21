@@ -1,0 +1,32 @@
+{
+  "summary": "RSM regression re-test after iteration_1 fixes. All three bug fixes verified: (1) Dashboard stale-state on rapid role switches is FIXED — cedente KPIs (3 published packs) remain stable across Cedente→Reaseg→Cedente→Admin→Cedente switch sequence. (2) Backend accept_quote double-call guard returns HTTP 400 'Quote already accepted'. (3) Backend sign_contract double-sign guard returns HTTP 400 'Already signed' for both cedente and reasegurador paths. Full pytest suite now 45/45 passing (added 3 new regression tests). Full reinsurance happy-path (publish → interest → NCA → chat → quote → accept → contract → closed) still works end-to-end. Pack detail page at /app/marketplace/:id still loads correctly as reasegurador.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 1356 lines — still recommended to split into routers (auth, packs, marketplace, operations, messages, broker, admin) for maintainability. Non-blocking.",
+    "All three issues flagged in iteration_1 have been fully addressed: accept_quote guard (server.py:755-756), sign_contract guard for both parties (server.py:783-784, 789-790), Dashboard/OperationsList/Messages useEffect deps include user?.id.",
+    "Admin dashboard page did not expose a `data-testid=\"dashboard-page\"` root (playwright couldn't confirm admin panel rendered after switch) — minor testability gap; functionally the role switch returns correctly to cedente after."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added 3 regression tests: test_accept_quote_second_call_rejected, test_cedente_cannot_sign_contract_twice, test_reasegurador_cannot_sign_contract_twice)"
+  ],
+  "success_rate": {"backend": "100% (45/45)", "frontend": "100% (role-switch stale-state fixed; pack detail loads)"},
+  "test_credentials": "Used seeded demo credentials from /app/memory/test_credentials.md — cedente@demo.eu / reasegurador@demo.eu / admin@rsm.eu (Demo123! / Admin123!).",
+  "seed_data_creation": "Each pytest run creates a fresh submission pack 'TEST_XL_Property_2026_<uuid>' and takes it through the full lifecycle to 'closed' (idempotent, safe to re-run). Cedente demo now has 3 published TEST packs and 3 closed ops.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Regression testing complete. Pytest suite at /app/backend/tests/backend_test.py has 45 tests covering full lifecycle + double-accept-quote + double-sign-contract negative cases. All pass in ~4.5s. Frontend role-switch stale-state was re-verified via playwright by performing the exact sequence from the review request (Landing→cedente→reaseg→cedente→admin→cedente) and observing KPIs remain stable ({published:3, interests:0, active:0, nca:0}) across all three cedente visits. No further action items for main agent. Demo cedente currently has 3 published TEST_XL_Property packs visible in Mis Programas.",
+  "rca of the issue": "Iteration_1 issues all resolved: (a) Dashboard.jsx/OperationsList.jsx/Messages.jsx now include user?.id in useEffect deps, forcing refetch on role switch; (b) accept_quote now checks op.get('contract_id') and returns 400 'Quote already accepted'; (c) sign_contract checks contract.get('signed_cedente') and contract.get('signed_reasegurador') and returns 400 'Already signed'."
+}

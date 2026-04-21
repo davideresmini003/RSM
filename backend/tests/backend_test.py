@@ -406,6 +406,16 @@ class TestQuoteFlow:
         assert r.status_code == 200, r.text
         assert "contract_id" in r.json()
 
+    def test_accept_quote_second_call_rejected(self, ced_c):
+        """REGRESSION: accept-quote twice should return 400 'Quote already accepted'."""
+        r = ced_c.post(
+            f"{BASE_URL}/api/operations/{STATE['operation_id']}/accept-quote",
+            json={},
+            timeout=10,
+        )
+        assert r.status_code == 400, r.text
+        assert "already accepted" in r.text.lower()
+
     def test_state_contract_pending(self, ced_c):
         r = ced_c.get(f"{BASE_URL}/api/operations/{STATE['operation_id']}", timeout=10)
         op = r.json()["operation"]
@@ -422,6 +432,16 @@ class TestContractFlow:
             timeout=10,
         )
         assert r.status_code == 200
+
+    def test_cedente_cannot_sign_contract_twice(self, ced_c):
+        """REGRESSION: double sign-contract as same party should return 400 'Already signed'."""
+        r = ced_c.post(
+            f"{BASE_URL}/api/operations/{STATE['operation_id']}/sign-contract",
+            json={"operation_id": STATE["operation_id"], "signer_name": "Carla Demo", "accepted": True},
+            timeout=10,
+        )
+        assert r.status_code == 400, r.text
+        assert "already signed" in r.text.lower()
 
     def test_still_contract_pending(self, rea_c):
         r = rea_c.get(f"{BASE_URL}/api/operations/{STATE['operation_id']}", timeout=10)
@@ -441,6 +461,16 @@ class TestContractFlow:
         op = r2.json()["operation"]
         assert op["state"] == "closed"
         assert op["closed_at"] is not None
+
+    def test_reasegurador_cannot_sign_contract_twice(self, rea_c):
+        """REGRESSION: reasegurador double-sign after already signed should return 400."""
+        r = rea_c.post(
+            f"{BASE_URL}/api/operations/{STATE['operation_id']}/sign-contract",
+            json={"operation_id": STATE["operation_id"], "signer_name": "Roberto Demo", "accepted": True},
+            timeout=10,
+        )
+        assert r.status_code == 400, r.text
+        assert "already signed" in r.text.lower()
 
 
 # ─── Admin ───────────────────────────────────────────────────────────────

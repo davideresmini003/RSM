@@ -12,7 +12,7 @@ export default function OperationsList() {
   const [ops, setOps] = useState([]);
   useEffect(() => {
     api.get("/operations").then(({ data }) => setOps(data.operations || []));
-  }, []);
+  }, [user?.id]);
 
   return (
     <div className="p-8 max-w-7xl mx-auto" data-testid="operations-list-page">

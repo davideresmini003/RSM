@@ -8,7 +8,7 @@ export default function Messages() {
   const { user } = useAuth();
   const { t } = useI18n();
   const [ops, setOps] = useState([]);
-  useEffect(() => { api.get("/operations").then(({ data }) => setOps(data.operations || [])); }, []);
+  useEffect(() => { api.get("/operations").then(({ data }) => setOps(data.operations || [])); }, [user?.id]);
 
   return (
     <div className="p-8 max-w-6xl mx-auto" data-testid="messages-page">

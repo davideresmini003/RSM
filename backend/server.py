@@ -752,6 +752,8 @@ async def accept_quote(op_id: str, request: Request, user: dict = Depends(requir
         raise HTTPException(status_code=404)
     if not op.get("quote_id"):
         raise HTTPException(status_code=400, detail="No quote")
+    if op.get("contract_id"):
+        raise HTTPException(status_code=400, detail="Quote already accepted")
     await db.quotes.update_one({"id": op["quote_id"]}, {"$set": {"accepted": True, "accepted_at": now_iso()}})
     # auto-create contract
     contract = {
@@ -773,12 +775,19 @@ async def sign_contract(op_id: str, payload: NcaSignIn, request: Request, user: 
     op = await db.operations.find_one({"id": op_id})
     if not op or not op.get("contract_id"):
         raise HTTPException(status_code=404)
+    contract = await db.contracts.find_one({"id": op["contract_id"]})
+    if not contract:
+        raise HTTPException(status_code=404)
     update = {}
     if op["cedente_user_id"] == user["id"]:
+        if contract.get("signed_cedente"):
+            raise HTTPException(status_code=400, detail="Already signed")
         update["signed_cedente"] = True
         update["signed_at_cedente"] = now_iso()
         update["signer_cedente"] = payload.signer_name
     elif op["reasegurador_user_id"] == user["id"]:
+        if contract.get("signed_reasegurador"):
+            raise HTTPException(status_code=400, detail="Already signed")
         update["signed_reasegurador"] = True
         update["signed_at_reasegurador"] = now_iso()
         update["signer_reasegurador"] = payload.signer_name
@@ -1177,6 +1186,8 @@ async def on_startup():
     await db.submission_packs.create_index("id", unique=True)
     await db.operations.create_index("id", unique=True)
     await db.audit_log.create_index("timestamp")
+    await db.audit_log.create_index("action")
+    await db.audit_log.create_index("user_id")
 
     # Admin
     admin = await db.users.find_one({"email": ADMIN_EMAIL})
