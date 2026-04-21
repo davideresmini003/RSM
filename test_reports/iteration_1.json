@@ -1,0 +1,44 @@
+{
+  "summary": "RSM Reinsurance Software Marketplace — full E2E review (first testing-agent run). Created comprehensive pytest suite (42 tests, 100% pass) covering auth, submission packs, marketplace list+detail, interests, operations, NCA signing + identity reveal, chat, quote, contract signing, admin, audit log, and negative cases. Frontend UI smoke test confirmed landing quick-access buttons, role switching, pack card → /app/marketplace/:id navigation, and admin panel. Backend is in excellent shape; UI nav is working; flagged a couple of UX concerns for main agent.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Cedente Dashboard", "issue": "After switching roles round-trip (Cedente → Reasegurador → Cedente → Admin → Cedente), the dashboard shows KPIs=0 and 'Sin datos todavía' for Mis Programas / Operaciones, even though the user has 2 packs and 1 operation. Data still exists on backend (verified via /api/stats/dashboard and /api/submission-packs/mine). Likely a stale-state / missing refetch on role-switch callback.", "selector": "Dashboard.jsx KPIs + Mis Programas list", "priority": "MEDIUM"},
+      {"component": "Landing/Sidebar", "issue": "Language toggle data-testid 'lang-toggle' not found. The ES/EN toggle exists visually (top of sidebar and landing header) but lacks the expected testid, making it hard to automate. Verify correct testid or add one.", "selector": "[data-testid='lang-toggle']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Marketplace card list (reasegurador)", "issues": ["Card showing '€3215' for 'Prova 1' Primas Y-1 looks like test leftover data — not a bug but worth cleaning up demo seed."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Investigate Cedente dashboard stale-empty state after role switch round-trip — ensure useEffect refetches /api/stats/dashboard and /api/submission-packs/mine whenever the auth token changes.",
+    "Add or confirm data-testid='lang-toggle' for the ES/EN switcher to ease future testing.",
+    "(Optional) Clean up low-quality leftover pack 'Prova 1' from the demo seed to present a cleaner marketplace."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1344 lines — consider splitting into routers (auth, packs, marketplace, operations, messages, broker, admin) for maintainability (>700 line guideline).",
+    "accept_quote endpoint does not validate that the quote hasn't already been accepted — repeated calls would create duplicate contracts. Add a guard: if op.get('contract_id') raise 400.",
+    "sign_contract allows a user in another role (neither cedente nor reasegurador party) to hit the endpoint only if their id matches — correct, but there is no guard against signing twice (signed_cedente/signed_reasegurador idempotent overwrite). Consider rejecting double-sign like NCA does.",
+    "CORS is set to '*' with allow_credentials=True via cookie auth — browsers will refuse cookies on wildcard origins. For production deployment explicit origins must be listed (this is fine in dev but flag for prod).",
+    "audit() swallows no errors (good) but there is no index on audit_log.timestamp/action — will degrade with volume."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (new)",
+    "/app/backend/tests/__init__.py (new)"
+  ],
+  "success_rate": {"backend": "100% (42/42)", "frontend": "~90% (navigation, role switch, landing quick-access, admin panel all work; one stale-state UX issue)"},
+  "test_credentials": "Used seeded demo credentials from /app/memory/test_credentials.md — cedente@demo.eu / reasegurador@demo.eu / broker@demo.eu (Demo123!) and admin@rsm.eu (Admin123!). All authenticated successfully.",
+  "seed_data_creation": "Backend test created one new submission pack titled 'TEST_XL_Property_2026_<hash>', expressed interest from reasegurador, accepted it, completed full operation lifecycle through 'closed' state. One closed operation (OP-F22840 / Helvetia Re Demo AG) is now persisted in the demo DB.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend is solid — the pytest suite at /app/backend/tests/backend_test.py exercises the entire reinsurance lifecycle end-to-end (landing → publish pack → express interest → accept → NCA bilateral sign → identity reveal → chat → quote → accept quote → contract bilateral sign → closed state) plus admin/audit/negative cases. All 42 tests pass in ~4.6 s. The test creates a fresh pack each run (unique UUID in title) so it is idempotent and safe to re-run. If retesting UI, note that the reasegurador demo account has already expressed interest on the TEST pack created during this run, so the 'Expresar interés' button will not re-appear on that specific pack — either create a new pack first or use a different pack id. Dashboard stale-state after role switch is the main UX issue to verify after fix.",
+  "rca of the issue": "Dashboard stale-state: after clicking 'switch-cedente' in Sidebar, the app navigates to /app but the dashboard component either (a) does not trigger its data-fetch useEffect because the auth context reference is re-used, or (b) briefly shows the 'empty' initial state before refetch completes and screenshot caught it. Recommend adding an explicit dependency on the current user id in the dashboard's useEffect and/or showing a skeleton loader instead of empty KPIs."
+}
