@@ -1,0 +1,189 @@
+{
+  "project_name": "RSM — Reinsurance Software Marketplace",
+  "theme": "LIGHT",
+  "archetype": "4 (Swiss & High-Contrast Institutional)",
+  "design_philosophy": "Institutional European finance meets modern clean SaaS. Strict, authoritative, document-like paper aesthetic. High-contrast typography for critical data parsing. Avoid all AI-slop purple gradients and generic SaaS curves. Everything feels like a legally binding, eIDAS-compliant digital document.",
+  "colors": {
+    "css_variables": {
+      "--background": "0 0% 100%",
+      "--foreground": "226 62% 11%",
+      "--card": "0 0% 100%",
+      "--card-foreground": "226 62% 11%",
+      "--popover": "0 0% 100%",
+      "--popover-foreground": "226 62% 11%",
+      "--primary": "226 62% 11%",
+      "--primary-foreground": "0 0% 100%",
+      "--secondary": "210 20% 98%",
+      "--secondary-foreground": "226 62% 11%",
+      "--muted": "214 32% 91%",
+      "--muted-foreground": "215 16% 47%",
+      "--accent": "358 75% 50%",
+      "--accent-foreground": "0 0% 100%",
+      "--destructive": "0 84% 60%",
+      "--destructive-foreground": "0 0% 100%",
+      "--border": "214 32% 91%",
+      "--input": "214 32% 91%",
+      "--ring": "226 62% 11%",
+      "--radius": "0px"
+    },
+    "semantic": {
+      "institutional_navy": "#0B132B",
+      "stark_white": "#FFFFFF",
+      "paper_offwhite": "#F8FAFC",
+      "signal_red": "#D32F2F",
+      "slate_grey": "#475569"
+    },
+    "status": {
+      "verified_bg": "#ECFDF5",
+      "verified_text": "#065F46",
+      "verified_border": "#34D399",
+      "anonymous_bg": "#F1F5F9",
+      "anonymous_text": "#475569",
+      "anonymous_border": "#CBD5E1",
+      "pending_bg": "#FFFBEB",
+      "pending_text": "#92400E",
+      "loss_good": "#10B981",
+      "loss_warn": "#F59E0B",
+      "loss_bad": "#EF4444"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "headings": "'Cabinet Grotesk', sans-serif",
+      "body": "'IBM Plex Sans', sans-serif",
+      "mono_data": "'IBM Plex Mono', monospace"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tighter leading-tight text-primary",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-primary",
+      "h3": "text-xl sm:text-2xl font-medium tracking-tight text-primary",
+      "h4": "text-lg font-medium tracking-tight text-primary",
+      "body": "text-base font-normal leading-relaxed text-slate-700",
+      "small_label": "text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground",
+      "data_value": "text-lg font-mono font-medium tracking-tight text-primary"
+    },
+    "rules": [
+      "No generic sans (Inter/Roboto) for headings.",
+      "Data codes (RSM-YYYY-XXXX) and financial figures must use IBM Plex Mono.",
+      "Overlines must be uppercase with 0.2em tracking.",
+      "Headings must use tight tracking (-0.02em to -0.04em)."
+    ]
+  },
+  "spacing_and_layout": {
+    "philosophy": "Grid Borders ('Technical' Look). Expose the skeleton. The grid must be visible.",
+    "container": "max-w-7xl mx-auto px-6 sm:px-8 lg:px-12",
+    "section_padding": "py-24 sm:py-32",
+    "bento_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-0 border-l border-t border-border",
+    "bento_item": "border-r border-b border-border p-6",
+    "rules": [
+      "Use 1px solid borders to create structural layouts.",
+      "Avoid soft drop shadows. Use hard 1px borders or solid 4px offset shadows for depth.",
+      "Cards and sections must feel like modular paper documents."
+    ]
+  },
+  "components": {
+    "kpi_cards": {
+      "structure": "Flat background, 1px border, 0px radius. No shadow. Minimalist data presentation.",
+      "classes": "bg-white border border-border p-6 flex flex-col gap-2 hover:bg-slate-50 transition-colors",
+      "value_classes": "text-3xl font-mono font-semibold text-primary",
+      "label_classes": "text-sm font-semibold tracking-[0.1em] uppercase text-muted-foreground"
+    },
+    "status_badges": {
+      "verified": "inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider bg-[#ECFDF5] text-[#065F46] border border-[#34D399] rounded-none",
+      "anonymous": "inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider bg-[#F1F5F9] text-[#475569] border border-[#CBD5E1] rounded-none",
+      "pending": "inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider bg-[#FFFBEB] text-[#92400E] border border-[#FCD34D] rounded-none"
+    },
+    "marketplace_cards": {
+      "structure": "Rectangular grid item, high information density. Focus on typographic hierarchy.",
+      "classes": "relative border border-border bg-white p-6 hover:border-primary transition-all flex flex-col gap-4",
+      "header": "flex justify-between items-start border-b border-border pb-4",
+      "code": "font-mono text-lg font-bold text-primary",
+      "loss_ratio_indicator": "flex items-center gap-2 text-sm font-mono"
+    },
+    "horizontal_timeline": {
+      "container": "flex items-center w-full",
+      "step": "flex flex-col items-center relative flex-1",
+      "line": "absolute top-4 left-1/2 w-full h-[2px] bg-border -z-10",
+      "node_completed": "w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm z-10",
+      "node_active": "w-8 h-8 rounded-full border-2 border-primary bg-white text-primary flex items-center justify-center font-bold text-sm z-10",
+      "node_pending": "w-8 h-8 rounded-full border-2 border-border bg-white text-muted-foreground flex items-center justify-center font-bold text-sm z-10",
+      "label": "mt-3 text-xs font-semibold uppercase tracking-widest text-center"
+    },
+    "digital_nca_modal": {
+      "overlay": "fixed inset-0 bg-primary/20 backdrop-blur-sm z-50",
+      "content": "fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl bg-white border-2 border-primary shadow-[8px_8px_0px_#0B132B] p-8 z-50 rounded-none",
+      "typography": "Feels like a legally binding document. Serif headers, mono data fields, stark white background.",
+      "signature_area": "border-2 border-dashed border-border p-8 text-center mt-6 bg-slate-50 cursor-pointer hover:border-primary transition-colors"
+    },
+    "chat_bubbles": {
+      "container": "flex flex-col gap-4 p-4",
+      "tabs": "flex border-b border-border mb-4",
+      "tab_active": "px-4 py-2 border-b-2 border-primary font-bold text-primary text-sm uppercase tracking-wider",
+      "tab_inactive": "px-4 py-2 text-muted-foreground text-sm uppercase tracking-wider hover:text-primary transition-colors",
+      "bubble_broker": "bg-primary text-white p-4 rounded-none max-w-[80%] self-end",
+      "bubble_client": "bg-slate-100 text-primary p-4 rounded-none max-w-[80%] self-start border border-border"
+    },
+    "buttons": {
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-3 text-sm font-semibold uppercase tracking-wider rounded-none transition-colors",
+      "secondary": "bg-transparent text-primary border border-primary hover:bg-primary hover:text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider rounded-none transition-colors"
+    },
+    "anonymity_indicators": {
+      "anonymous_state": "filter blur-[6px] opacity-70 select-none cursor-not-allowed",
+      "revealed_state": "font-bold text-primary transition-all duration-500",
+      "lock_icon": "lucide-lock text-muted-foreground w-4 h-4"
+    }
+  },
+  "media": {
+    "images": [
+      {
+        "category": "hero_background",
+        "url": "https://images.unsplash.com/photo-1774112168783-57b6b75a9353?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBldXJvcGVhbiUyMGFyY2hpdGVjdHVyZSUyMGZpbmFuY2lhbCUyMGRpc3RyaWN0fGVufDB8fHx8MTc3Njc1OTY4OHww&ixlib=rb-4.1.0&q=85",
+        "description": "Modern skyscrapers reflected in a calm river under blue sky - Use for landing page hero, combined with a stark white gradient overlay for text readability."
+      },
+      {
+        "category": "hero_architecture_alternate",
+        "url": "https://images.pexels.com/photos/30236029/pexels-photo-30236029.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Contemporary skyscrapers reaching for the sky in Frankfurt - Can be used for auth pages or platform loading screens."
+      },
+      {
+        "category": "broker_profile_1",
+        "url": "https://images.unsplash.com/photo-1737574821698-862e77f044c1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBleGVjdXRpdmUlMjBwb3J0cmFpdHxlbnwwfHx8fDE3NzY3NTk2ODl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Professional male executive at a desk - Use for Broker marketplace profile mockups."
+      },
+      {
+        "category": "broker_profile_2",
+        "url": "https://images.pexels.com/photos/8871934/pexels-photo-8871934.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Professional female executive - Use for Broker marketplace profile mockups."
+      },
+      {
+        "category": "document_texture",
+        "url": "https://images.pexels.com/photos/7953297/pexels-photo-7953297.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Close-up of paper texture - Use very subtly (opacity 2-5%) as a background texture overlay to enforce the 'institutional document' feel."
+      }
+    ],
+    "icons": {
+      "library": "lucide-react",
+      "rules": "Use stroke-width 1.5. Icons should feel like technical schematic symbols. Do not use filled versions unless indicating a selected state."
+    }
+  },
+  "motion": {
+    "philosophy": "Minimalist and precise. Micro-interactions for feedback. No bouncy or playful animations.",
+    "hover": "transition-all duration-200 ease-in-out",
+    "reveal": "transition-all duration-500 ease-out (used for revealing anonymous data)",
+    "modal": "animate-in fade-in zoom-in-95 duration-200"
+  },
+  "accessibility": {
+    "contrast": "Strict APCA compliance. All text on pure white must be #0B132B (Navy) or #475569 (Slate).",
+    "focus": "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+    "data_testid": "All interactive and key informational elements MUST include a data-testid attribute formatted as kebab-case, role-based."
+  },
+  "instructions_to_main_agent": [
+    "Ensure the app toggles between ES and EN. Default to ES.",
+    "Do not use Shadcn 'Card' with rounded corners. Override the radius to 0px across all Shadcn components via Tailwind config or class names.",
+    "Use standard HTML tables with strict border-collapse for data grids, or grid layouts with explicit borders.",
+    "Implement the 3 dimensions for ratings using a minimal star component (lucide-star) colored with the brand's primary color, not yellow.",
+    "Implement the anonymity logic clearly: a lock icon, a blurred text class, and a verification badge are paramount for the UX.",
+    "The digital NCA modal must look like a physical document—white background, serif headers, mono text for the cryptographic ID.",
+    "DO NOT use placeholder image URLs. Use the exact URLs provided in the media.images section of this JSON."
+  ]
+}
