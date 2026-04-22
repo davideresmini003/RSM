@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import { DEMO_ACCOUNTS, quickLogin } from "../lib/demoAccess";
+import { log } from "../lib/log";
 import { LayoutDashboard, Briefcase, MessageSquare, Users, Store, FileText, ClipboardList, ShieldCheck, UserCircle2, LogOut, Languages, RefreshCw } from "lucide-react";
 
 export function RoleSidebar() {
@@ -21,7 +22,7 @@ export function RoleSidebar() {
       await refresh();
       navigate(newRole === "admin" ? "/app/admin" : "/app");
     } catch (e) {
-      console.warn("Role switch failed:", e.message);
+      log.warn("Role switch failed:", e.message);
     }
   };
 

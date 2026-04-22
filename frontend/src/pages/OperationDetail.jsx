@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
+import { log } from "../lib/log";
 import { Timeline } from "../components/Timeline";
 import { VerifiedBadge, AnonBadge } from "../components/ui-bits";
 import { Lock, FileSignature, Send, Star } from "lucide-react";
@@ -294,7 +295,7 @@ function ChatSection({ op, user }) {
       setMsgs(data.messages || []);
       setLocked(data.locked);
     } catch (e) {
-      console.warn("Message load failed:", e.message);
+      log.warn("Message load failed:", e.message);
     }
   }, [op.id, channel]);
   useEffect(() => { load(); const i = setInterval(load, 4000); return () => clearInterval(i); }, [load]);

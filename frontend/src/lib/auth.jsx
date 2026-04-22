@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { api, formatApiError } from "./api";
+import { log } from "./log";
 
 const AuthCtx = createContext(null);
 
@@ -16,7 +17,7 @@ export function AuthProvider({ children }) {
     } catch (e) {
       if (e.response?.status !== 401) {
         // 401 is expected when not logged in; log other errors for debugging
-        console.warn("auth/me failed:", e.message);
+        log.warn("auth/me failed:", e.message);
       }
       setUser(null);
       setCompany(null);
@@ -55,7 +56,7 @@ export function AuthProvider({ children }) {
     try {
       await api.post("/auth/logout");
     } catch (e) {
-      console.warn("Logout request failed:", e.message);
+      log.warn("Logout request failed:", e.message);
     }
     localStorage.removeItem("rsm_token");
     setUser(null);
