@@ -2,29 +2,16 @@ import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
-import { DEMO_ACCOUNTS, quickLogin } from "../lib/demoAccess";
-import { log } from "../lib/log";
-import { LayoutDashboard, Briefcase, MessageSquare, Users, Store, FileText, ClipboardList, ShieldCheck, UserCircle2, LogOut, Languages, RefreshCw } from "lucide-react";
+import { LayoutDashboard, Briefcase, MessageSquare, Users, Store, FileText, ClipboardList, ShieldCheck, UserCircle2, LogOut, Languages } from "lucide-react";
 
 export function RoleSidebar() {
-  const { user, refresh } = useAuth();
+  const { user } = useAuth();
   const { t, lang, setLang } = useI18n();
   const loc = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
   if (!user) return null;
   const role = user.role;
-
-  const switchRole = async (newRole) => {
-    if (newRole === role) return;
-    try {
-      await quickLogin(newRole);
-      await refresh();
-      navigate(newRole === "admin" ? "/app/admin" : "/app");
-    } catch (e) {
-      log.warn("Role switch failed:", e.message);
-    }
-  };
 
   const base = [{ to: "/app", icon: LayoutDashboard, label: t("nav.dashboard"), exact: true }];
   if (role === "cedente") {
@@ -83,26 +70,6 @@ export function RoleSidebar() {
         })}
       </nav>
       <div className="border-t border-[hsl(var(--border))] p-4 space-y-3">
-        <div>
-          <div className="overline flex items-center gap-1 mb-2"><RefreshCw size={10} strokeWidth={2} /> Cambiar rol · demo</div>
-          <div className="grid grid-cols-2 gap-1">
-            {DEMO_ACCOUNTS.map((a) => (
-              <button
-                key={a.role}
-                onClick={() => switchRole(a.role)}
-                disabled={a.role === role}
-                className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-1.5 border transition-colors ${
-                  a.role === role
-                    ? "bg-[#0B132B] text-white border-[#0B132B] cursor-default"
-                    : "bg-white text-slate-600 border-[hsl(var(--border))] hover:border-[#0B132B] hover:text-[#0B132B]"
-                }`}
-                data-testid={`switch-${a.role}`}
-              >
-                {a.label}
-              </button>
-            ))}
-          </div>
-        </div>
         <div className="flex items-center gap-2 text-xs">
           <Languages size={14} strokeWidth={1.5} />
           <button

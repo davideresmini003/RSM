@@ -1189,12 +1189,14 @@ async def on_startup():
     await db.audit_log.create_index("action")
     await db.audit_log.create_index("user_id")
 
-    # Admin
-    admin = await db.users.find_one({"email": ADMIN_EMAIL})
+    # Admin — seed from env, remove stale admins, ensure configured email has admin role
+    admin_email = ADMIN_EMAIL.lower()
+    await db.users.delete_many({"role": "admin", "email": {"$ne": admin_email}})
+    admin = await db.users.find_one({"email": admin_email})
     if not admin:
         await db.users.insert_one({
             "id": str(uuid.uuid4()),
-            "email": ADMIN_EMAIL,
+            "email": admin_email,
             "password_hash": hash_password(ADMIN_PASSWORD),
             "name": "RSM Admin",
             "role": "admin",
@@ -1203,10 +1205,15 @@ async def on_startup():
             "onboarding_complete": True,
             "created_at": now_iso(),
         })
-        log.info(f"Seeded admin: {ADMIN_EMAIL}")
+        log.info(f"Seeded admin: {admin_email}")
     else:
+        # Promote to admin role if user already existed with a different role
+        update = {"role": "admin", "verified": True, "onboarding_complete": True}
         if not verify_password(ADMIN_PASSWORD, admin["password_hash"]):
-            await db.users.update_one({"email": ADMIN_EMAIL}, {"$set": {"password_hash": hash_password(ADMIN_PASSWORD)}})
+            update["password_hash"] = hash_password(ADMIN_PASSWORD)
+        await db.users.update_one({"email": admin_email}, {"$set": update})
+        if admin.get("role") != "admin":
+            log.info(f"Promoted existing user to admin: {admin_email}")
 
     # Demo users + companies
     await _ensure_demo_user(

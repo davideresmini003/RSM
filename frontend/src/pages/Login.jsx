@@ -22,15 +22,6 @@ export default function Login() {
     else setErr(r.error);
   };
 
-  const demo = async (email) => {
-    setEmail(email); setPassword("Demo123!");
-    setLoading(true); setErr("");
-    const r = await login(email, "Demo123!");
-    setLoading(false);
-    if (r.ok) nav("/app");
-    else setErr(r.error);
-  };
-
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2" data-testid="login-page">
       <div className="hidden lg:block hero-gradient relative overflow-hidden">
@@ -65,27 +56,6 @@ export default function Login() {
               {loading ? t("common.loading") : t("common.login")}
             </button>
           </form>
-
-          <div className="mt-8">
-            <div className="overline mb-3 text-center">Demo accounts</div>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: "Cedente", email: "cedente@demo.eu" },
-                { label: "Reasegur.", email: "reasegurador@demo.eu" },
-                { label: "Broker", email: "broker@demo.eu" },
-              ].map((d) => (
-                <button
-                  key={d.email}
-                  onClick={() => demo(d.email)}
-                  className="border border-[hsl(var(--border))] px-3 py-2 text-[10px] uppercase tracking-wider font-semibold hover:bg-slate-50"
-                  data-testid={`demo-${d.label.toLowerCase()}`}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-3 text-center text-xs text-slate-400">Admin: admin@rsm.eu / Admin123!</p>
-          </div>
 
           <p className="mt-8 text-sm text-slate-600">
             ¿Sin cuenta? <Link to="/register" className="font-semibold text-[#0B132B] hover:underline" data-testid="link-register">{t("common.register")}</Link>
