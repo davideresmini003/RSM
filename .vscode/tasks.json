@@ -1,0 +1,52 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "MongoDB · arrancar (docker compose)",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "MongoDB · parar",
+      "type": "shell",
+      "command": "docker compose down",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend · arrancar (uvicorn :8001)",
+      "type": "shell",
+      "command": "${workspaceFolder}/backend/.venv/bin/uvicorn server:app --host 0.0.0.0 --port 8001 --reload",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend · arrancar (yarn start :3000)",
+      "type": "shell",
+      "command": "yarn start",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "▶ Stack completa (Mongo + Backend + Frontend)",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "MongoDB · arrancar (docker compose)",
+        "Backend · arrancar (uvicorn :8001)",
+        "Frontend · arrancar (yarn start :3000)"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend · tests (pytest)",
+      "type": "shell",
+      "command": "${workspaceFolder}/backend/.venv/bin/pytest tests/ -v",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "problemMatcher": []
+    }
+  ]
+}

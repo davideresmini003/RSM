@@ -1,0 +1,20 @@
+version: "3.9"
+
+# docker-compose.yml — MongoDB local para desarrollo de RSM
+# Uso:
+#   docker compose up -d        # arranca MongoDB en background
+#   docker compose down         # para MongoDB (conserva datos)
+#   docker compose down -v      # para y BORRA todos los datos
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: rsm-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - rsm_mongo_data:/data/db
+
+volumes:
+  rsm_mongo_data:

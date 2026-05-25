@@ -1,0 +1,85 @@
+### RSM API · ejemplos rápidos (REST Client extension)
+### Instala "humao.rest-client" en VS Code y haz clic en "Send Request" sobre cada bloque.
+
+@base = http://localhost:8001/api
+
+### 1) Login como Cedente demo
+# @name loginCedente
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "cedente@demo.eu",
+  "password": "Demo123!"
+}
+
+### 2) Login como Reasegurador demo
+# @name loginRea
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "reasegurador@demo.eu",
+  "password": "Demo123!"
+}
+
+###
+@tokenCedente = {{loginCedente.response.body.access_token}}
+@tokenRea = {{loginRea.response.body.access_token}}
+
+### 3) Yo (verifica el JWT)
+GET {{base}}/auth/me
+Authorization: Bearer {{tokenCedente}}
+
+### 4) Marketplace de packs
+GET {{base}}/marketplace/packs
+Authorization: Bearer {{tokenRea}}
+
+### 5) Crear un Submission Pack (como cedente)
+POST {{base}}/submission-packs
+Authorization: Bearer {{tokenCedente}}
+Content-Type: application/json
+
+{
+  "title": "Property Cat Test 2026",
+  "branch": "Property",
+  "reinsurance_type": "Excess of Loss",
+  "country_region": "España",
+  "coverage_period": "01/01/2026 – 31/12/2026",
+  "cession_pct": 30,
+  "premiums_y1": 10000000, "premiums_y2": 9500000, "premiums_y3": 9000000,
+  "loss_ratio_y1": 60, "loss_ratio_y2": 55, "loss_ratio_y3": 62,
+  "description": "Test pack creado desde REST Client",
+  "status": "published",
+  "broker_id": null
+}
+
+### 6) Expresar interés (como reasegurador) — sustituye PACK_ID
+POST {{base}}/interests
+Authorization: Bearer {{tokenRea}}
+Content-Type: application/json
+
+{
+  "pack_id": "PACK_ID_AQUÍ",
+  "message": "Interesados en cotizar este programa."
+}
+
+### 7) Listar operaciones
+GET {{base}}/operations
+Authorization: Bearer {{tokenCedente}}
+
+### 8) Audit log (admin)
+# @name loginAdmin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@rsm.local",
+  "password": "Admin123!"
+}
+
+###
+@tokenAdmin = {{loginAdmin.response.body.access_token}}
+
+GET {{base}}/admin/audit
+Authorization: Bearer {{tokenAdmin}}

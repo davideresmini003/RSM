@@ -2,7 +2,8 @@
 
 # IDE and editors
 .idea/
-.vscode/
+# Keep .vscode/ committed so contributors share the same workspace config
+# (uncomment to ignore: .vscode/)
 
 # Dependencies
 node_modules/
@@ -31,6 +32,12 @@ dist/
 dist
 
 # Environment files (comprehensive coverage)
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+!*.env.example
 
 *token.json*
 *credentials.json*
