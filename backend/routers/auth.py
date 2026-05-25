@@ -72,7 +72,7 @@ async def create_company(payload: CompanyIn, request: Request, user: dict = Depe
         "id": existing["id"] if existing else str(uuid.uuid4()),
         "role": user["role"],
         "owner_user_id": user["id"],
-        "verified": existing.get("verified", False) if existing else False,
+        "verified": existing.get("verified", True) if existing else True,
         "created_at": existing.get("created_at") if existing else now_iso(),
         **payload.model_dump(),
     }

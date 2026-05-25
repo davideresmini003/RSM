@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from database import client
 from seed import seed_database
-from routers import auth, marketplace, operations, broker, admin, support
+from routers import auth, marketplace, operations, broker, admin, support, pack_files, notifications
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,6 +20,8 @@ app.include_router(operations.router, prefix="/api")
 app.include_router(broker.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(support.router, prefix="/api")
+app.include_router(pack_files.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

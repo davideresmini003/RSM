@@ -45,6 +45,8 @@ export default function NewPack() {
     return true;
   };
 
+  const [files, setFiles] = useState([]);
+
   const save = async (status) => {
     if (status === "published" && !confirm) { setErr("Marca la casilla de confirmación."); return; }
     try {
@@ -56,7 +58,16 @@ export default function NewPack() {
         premiums_y1: Number(f.premiums_y1) || 0, premiums_y2: Number(f.premiums_y2) || 0, premiums_y3: Number(f.premiums_y3) || 0,
         loss_ratio_y1: Number(f.loss_ratio_y1) || 0, loss_ratio_y2: Number(f.loss_ratio_y2) || 0, loss_ratio_y3: Number(f.loss_ratio_y3) || 0,
       };
-      await api.post("/submission-packs", payload);
+      const { data } = await api.post("/submission-packs", payload);
+      // upload any pending files now that the pack exists
+      const packId = data?.pack?.id;
+      if (packId && files.length > 0) {
+        for (const fl of files) {
+          const fd = new FormData();
+          fd.append("file", fl);
+          try { await api.post(`/submission-packs/${packId}/files`, fd); } catch (_) { /* skip on error */ }
+        }
+      }
       nav("/app");
     } catch (e) {
       const detail = e.response?.data?.detail || "";
@@ -202,14 +213,41 @@ export default function NewPack() {
         {step === 3 && (
           <div className="space-y-5">
             <div className="overline">{t("pack.step3")}</div>
-            <p className="text-sm text-slate-600">Los documentos quedan clasificados como post-NCA: visibles al reasegurador solo tras la firma. Para el MVP la carga se simula.</p>
-            <div className="space-y-2">
-              {["SFCR", "Histórico de primas (3 años)", "Histórico de siniestros", "Grandes siniestros", "Exposición geográfica", "Estructura de reaseguro actual"].map((d) => (
-                <div key={d} className="border border-dashed border-[hsl(var(--border))] p-3 text-sm text-slate-500 flex justify-between">
-                  <span>{d}</span><span className="overline">Upload (simulado)</span>
-                </div>
-              ))}
-            </div>
+            <p className="text-sm text-slate-600">Sube los documentos del programa. Quedan clasificados como <b>post-NCA</b>: solo serán visibles al reasegurador después de la firma digital del NCA por ambas partes. Máx. 10 MB por archivo.</p>
+            <label className="block border-2 border-dashed border-[hsl(var(--border))] hover:border-[#0B132B] p-8 text-center cursor-pointer transition-colors" data-testid="pack-file-dropzone">
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const picked = Array.from(e.target.files || []);
+                  const allowed = picked.filter((fl) => fl.size <= 10 * 1024 * 1024);
+                  setFiles((prev) => [...prev, ...allowed]);
+                  e.target.value = "";
+                }}
+                data-testid="pack-file-input"
+              />
+              <div className="overline text-[#0B132B]">+ Añadir archivos</div>
+              <div className="text-xs text-slate-500 mt-2">SFCR · Histórico de primas · Siniestros · Cualquier PDF/Excel/Word</div>
+            </label>
+            {files.length > 0 && (
+              <div className="space-y-2" data-testid="pack-file-list">
+                {files.map((fl, idx) => (
+                  <div key={`${fl.name}-${idx}`} className="border border-[hsl(var(--border))] p-3 text-sm flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{fl.name}</div>
+                      <div className="text-xs text-slate-500 font-mono-data">{(fl.size / 1024).toFixed(1)} KB · {fl.type || "—"}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFiles((prev) => prev.filter((_, i) => i !== idx))}
+                      className="rsm-btn-danger"
+                      data-testid={`pack-file-remove-${idx}`}
+                    >Eliminar</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

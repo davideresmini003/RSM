@@ -652,6 +652,7 @@ function ChatSection({ op, user }) {
 function DocumentsSection({ op, bothSigned }) {
   const toast = useToast();
   const [docs, setDocs] = useState([]);
+  const [packFiles, setPackFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
 
@@ -660,7 +661,11 @@ function DocumentsSection({ op, bothSigned }) {
       const { data } = await api.get(`/messages/${op.id}`, { params: { channel: "documents" } });
       setDocs((data.messages || []).filter((m) => m.attachment));
     } catch (_) {}
-  }, [op.id]);
+    try {
+      const { data } = await api.get(`/submission-packs/${op.pack_id}/files`);
+      setPackFiles(data.files || []);
+    } catch (_) {}
+  }, [op.id, op.pack_id]);
 
   useEffect(() => { if (bothSigned) load(); }, [bothSigned, load]);
 
@@ -694,25 +699,58 @@ function DocumentsSection({ op, bothSigned }) {
           </>
         )}
       </div>
-      <div className="mt-4 space-y-2">
-        {!bothSigned && (
-          <div className="text-sm text-slate-400 py-6 text-center border border-[hsl(var(--border))]">
-            <Lock size={16} className="inline mr-2" strokeWidth={1.5} />Firma el NCA para subir y ver documentos
+      {!bothSigned && (
+        <div className="mt-4 text-sm text-slate-400 py-6 text-center border border-[hsl(var(--border))]">
+          <Lock size={16} className="inline mr-2" strokeWidth={1.5} />Firma el NCA para subir y ver documentos
+        </div>
+      )}
+      {bothSigned && (
+        <>
+          {/* Pack original docs (uploaded by cedente at publication) */}
+          <div className="mt-6">
+            <div className="overline mb-2">Documentación del Submission Pack ({packFiles.length})</div>
+            {packFiles.length === 0 ? (
+              <div className="text-xs text-slate-400 py-4 text-center border border-[hsl(var(--border))]">La cedente no adjuntó documentos en la publicación.</div>
+            ) : (
+              <div className="space-y-2">
+                {packFiles.map((pf) => (
+                  <div key={pf.id} className="flex items-center justify-between border border-[hsl(var(--border))] p-3 text-sm" data-testid={`pack-file-${pf.id}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileIcon size={14} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{pf.filename}</span>
+                      <span className="text-xs text-slate-400 font-mono-data shrink-0">({formatFileSize(pf.size)})</span>
+                    </div>
+                    <a
+                      href={`${API}/pack-files/${pf.id}/download`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="overline text-[#0B132B] hover:text-[#D32F2F] shrink-0 ml-3"
+                      data-testid={`download-pack-file-${pf.id}`}
+                    >Descargar →</a>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-        {bothSigned && docs.length === 0 && (
-          <div className="text-sm text-slate-400 py-6 text-center border border-[hsl(var(--border))]">No hay documentos todavía. Sube el primero.</div>
-        )}
-        {docs.map((m) => (
-          <div key={m.id} className="flex items-center justify-between border border-[hsl(var(--border))] p-3 text-sm">
-            <div className="flex items-center gap-2">
-              <FileIcon size={14} className="text-slate-400 shrink-0" />
-              <span>{m.attachment.filename}</span>
-              <span className="text-xs text-slate-400">({formatFileSize(m.attachment.size)})</span>
-            </div>
-            <a
-              href={`${API}/messages/${m.id}/attachment`}
-              target="_blank"
+
+          {/* Docs uploaded during negotiation */}
+          <div className="mt-6">
+            <div className="overline mb-2">Documentos compartidos en la negociación ({docs.length})</div>
+            {docs.length === 0 ? (
+              <div className="text-xs text-slate-400 py-4 text-center border border-[hsl(var(--border))]">No hay documentos compartidos todavía.</div>
+            ) : (
+              <div className="space-y-2">
+                {docs.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between border border-[hsl(var(--border))] p-3 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileIcon size={14} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{m.attachment.filename}</span>
+                      <span className="text-xs text-slate-400 font-mono-data shrink-0">({formatFileSize(m.attachment.size)})</span>
+                      <span className="text-xs text-slate-500 shrink-0">· {m.sender_name}</span>
+                    </div>
+                    <a
+                      href={`${API}/messages/${m.id}/attachment`}
+                      target="_blank"
               rel="noreferrer"
               className="overline text-[#0B132B] hover:underline text-[10px]"
             >
@@ -720,7 +758,11 @@ function DocumentsSection({ op, bothSigned }) {
             </a>
           </div>
         ))}
-      </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

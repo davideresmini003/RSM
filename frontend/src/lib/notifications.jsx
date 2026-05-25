@@ -12,6 +12,8 @@ export function markChatRead(opId) {
   const map = getReadMap();
   map[opId] = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+  // Notify any active NotificationsProvider to refresh immediately
+  try { window.dispatchEvent(new CustomEvent("rsm:chat-read", { detail: { opId } })); } catch (_) {}
 }
 
 const NotifCtx = createContext({ chat: 0, operations: 0, solicitudes: 0, interests: 0, refresh: () => {} });
@@ -40,7 +42,12 @@ export function NotificationsProvider({ children }) {
     if (!user) { setCounts({ chat: 0, operations: 0, solicitudes: 0, interests: 0 }); return; }
     poll();
     timerRef.current = setInterval(poll, 10000);
-    return () => clearInterval(timerRef.current);
+    const onReadEvent = () => { poll(); };
+    window.addEventListener("rsm:chat-read", onReadEvent);
+    return () => {
+      clearInterval(timerRef.current);
+      window.removeEventListener("rsm:chat-read", onReadEvent);
+    };
   }, [user, poll]);
 
   return <NotifCtx.Provider value={{ ...counts, refresh: poll }}>{children}</NotifCtx.Provider>;
