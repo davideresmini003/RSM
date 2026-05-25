@@ -46,6 +46,7 @@ export default function NewPack() {
   };
 
   const [files, setFiles] = useState([]);
+  const [previewFile, setPreviewFile] = useState(null);
 
   const save = async (status) => {
     if (status === "published" && !confirm) { setErr("Marca la casilla de confirmación."); return; }
@@ -59,9 +60,15 @@ export default function NewPack() {
         loss_ratio_y1: Number(f.loss_ratio_y1) || 0, loss_ratio_y2: Number(f.loss_ratio_y2) || 0, loss_ratio_y3: Number(f.loss_ratio_y3) || 0,
       };
       const { data } = await api.post("/submission-packs", payload);
-      // upload any pending files now that the pack exists
       const packId = data?.pack?.id;
-      if (packId && files.length > 0) {
+      if (packId) {
+        // Public preview document (visible before NCA)
+        if (previewFile) {
+          const fd = new FormData();
+          fd.append("file", previewFile);
+          try { await api.post(`/submission-packs/${packId}/files?is_preview=true`, fd); } catch (_) { /* skip on error */ }
+        }
+        // Confidential post-NCA documents
         for (const fl of files) {
           const fd = new FormData();
           fd.append("file", fl);

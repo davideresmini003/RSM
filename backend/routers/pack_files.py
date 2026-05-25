@@ -26,25 +26,31 @@ async def _can_see_pack_files(pack: dict, user: dict) -> bool:
         return True
     if user_company and user_company == pack.get("cedente_company_id"):
         return True
-    # Reasegurador: any user from a company that has an operation on this pack where both NCAs are signed
+    # Reasegurador: any user from a company that has an operation on this pack where ALL NCAs are signed
     if user["role"] == "reasegurador" and user_company:
-        op = await db.operations.find_one({
+        ops_q = {
             "pack_id": pack["id"],
             "reasegurador_company_id": user_company,
             "nca_signed_cedente": True,
             "nca_signed_reasegurador": True,
-        })
-        if op:
+            "state": {"$nin": ["cancelled"]},
+        }
+        async for op in db.operations.find(ops_q):
+            # If operation has broker, broker NCA must also be signed
+            if op.get("broker_user_id") and not op.get("nca_signed_broker"):
+                continue
             return True
     # Broker
     if user["role"] == "broker" and pack.get("broker_id") == user["id"]:
-        # broker can see once at least one operation exists with NCAs both signed
-        op = await db.operations.find_one({
+        ops_q = {
             "pack_id": pack["id"],
             "broker_user_id": user["id"],
             "nca_signed_cedente": True,
             "nca_signed_reasegurador": True,
-        })
+            "nca_signed_broker": True,
+            "state": {"$nin": ["cancelled"]},
+        }
+        op = await db.operations.find_one(ops_q)
         if op:
             return True
     return False
@@ -92,10 +98,35 @@ async def list_pack_files(pack_id: str, user: dict = Depends(get_current_user)):
     pack = await db.submission_packs.find_one({"id": pack_id})
     if not pack:
         raise HTTPException(status_code=404)
+    is_owner = _is_pack_owner(pack, user)
     can_see_all = await _can_see_pack_files(pack, user)
     if can_see_all:
         files = await db.pack_files.find({"pack_id": pack_id}, {"_id": 0, "data": 0}).sort("uploaded_at", 1).to_list(100)
-        return {"files": files, "locked": False, "is_owner": _is_pack_owner(pack, user)}
+        # Owners (cedente / admin) see everything as-is. Counterparties (reasegurador, broker)
+        # see a snapshot frozen at the moment the NCA was completed in their operation.
+        if not is_owner and user["role"] != "admin":
+            user_company = user.get("company_id")
+            op_filter = {"pack_id": pack_id, "state": {"$nin": ["cancelled"]}}
+            if user["role"] == "reasegurador":
+                op_filter["reasegurador_company_id"] = user_company
+            elif user["role"] == "broker":
+                op_filter["broker_user_id"] = user["id"]
+            cutoff = None
+            async for op in db.operations.find(op_filter):
+                if not (op.get("nca_signed_cedente") and op.get("nca_signed_reasegurador")):
+                    continue
+                if op.get("broker_user_id") and not op.get("nca_signed_broker"):
+                    continue
+                # operation is fully NCA-signed for this counterparty → use the latest NCA signature as the freeze cutoff
+                stamps = [op.get("nca_signed_at_cedente"), op.get("nca_signed_at_reasegurador")]
+                if op.get("broker_user_id"):
+                    stamps.append(op.get("nca_signed_at_broker"))
+                ts = max([s for s in stamps if s], default=None)
+                if ts and (cutoff is None or ts > cutoff):
+                    cutoff = ts
+            if cutoff:
+                files = [f for f in files if (f.get("uploaded_at") or "") <= cutoff or f.get("is_preview")]
+        return {"files": files, "locked": False, "is_owner": is_owner}
     # Anyone authenticated can see ONLY preview files (no NCA needed)
     preview = await db.pack_files.find({"pack_id": pack_id, "is_preview": True}, {"_id": 0, "data": 0}).sort("uploaded_at", 1).to_list(50)
     return {"files": preview, "locked": True, "is_owner": False}

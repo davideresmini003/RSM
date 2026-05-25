@@ -308,7 +308,7 @@ async def marketplace_packs(
 async def marketplace_pack_detail(pack_id: str, user: dict = Depends(get_current_user)):
     pack = await db.submission_packs.find_one({"id": pack_id, "status": "published"}, {"_id": 0})
     if not pack:
-        raise HTTPException(status_code=404, detail="Pack not available")
+        raise HTTPException(status_code=404, detail="Pack no disponible")
     company = await db.companies.find_one({"id": pack["cedente_company_id"]}, {"_id": 0, "verified": 1, "country": 1})
     is_verified = bool(company and company.get("verified"))
     broker_name = None

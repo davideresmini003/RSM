@@ -259,7 +259,7 @@ async def create_rating(payload: RatingIn, request: Request, user: dict = Depend
         raise HTTPException(status_code=400, detail="Broker not part of this operation")
     existing = await db.ratings.find_one({"operation_id": payload.operation_id, "rater_id": user["id"]})
     if existing:
-        raise HTTPException(status_code=400, detail="Already rated")
+        raise HTTPException(status_code=400, detail="Ya valorado")
     r = {
         "id": str(uuid.uuid4()),
         "operation_id": payload.operation_id,

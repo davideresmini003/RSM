@@ -1,0 +1,45 @@
+{
+  "summary": "RSM iteration_3 — verified tripartite NCA helper, pre-NCA preview docs (E7), demo closed op OP-DEMO01 (D3), Spanish error i18n (E1), express-interest perm fix (A1), and pack files freeze (A4). New pytest suite test_iter3_features.py (10 tests) is 10/10 green. Backend regression: previous backend_test.py from iteration_2 still depends on old credentials (cedente@demo.eu/Demo123!) which no longer match the seed (now aseguradora@rsm.com/Admin123!) — needs updating by main agent. UI smoke: cedente sees OP-DEMO01 as CERRADA in /app/operations; reasegurador can fetch pack files including is_preview=true PDF for the closed OP-DEMO01 (A4 freeze working). One React console warning observed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/login", "issue": "iteration_2 backend_test.py uses obsolete demo credentials (cedente@demo.eu/Demo123!) — those users no longer exist. The current seed uses aseguradora@rsm.com / Admin123!. The legacy test file needs credential update."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Cedente Operations or Dashboard list", "issue": "React console warning: 'Encountered two children with the same key' repeated ~100+ times with key fcf8c29e-e6bd-41de-8cce-1717ce23d51e. Indicates a list (probably packs/operations) renders duplicate items with the same React key. Likely a duplicated pack/operation row or a missing unique key prop. Non-blocking but should be fixed.", "selector": "console log only", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Pack detail (reasegurador) → preview docs", "issue": "Could not confirm via DOM scrape that the 'Documento de presentación · pre-NCA' section renders with the Presentacion-RSM-2026-XXXX.pdf filename and a Download anchor. Backend GET /api/submission-packs/{id}/files correctly returns is_preview=true file to a non-interested reasegurador (verified independently). Recommend visual verification by main agent (or improved data-testid on the section).", "affected_selectors": ["a[href*='/pack-files/'][href*='download']", "[data-testid='pre-nca-preview-section']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter3_features.py",
+    "/app/test_reports/pytest/iter3_results.xml"
+  ],
+  "action_items": [
+    "Fix React duplicate-key warning (key fcf8c29e-e6bd-41de-8cce-1717ce23d51e) — likely a list rendering the same id twice. Check Dashboard.jsx / OperationsList.jsx for duplicate items from concurrent fetches or merging.",
+    "Add data-testid to the pre-NCA preview section in SubmissionPackDetail.jsx (e.g., data-testid='pre-nca-preview-section' on the wrapper and data-testid='pre-nca-preview-download' on the download anchor) so the UI assertion is reliable.",
+    "Update legacy /app/backend/tests/backend_test.py credentials from cedente@demo.eu/Demo123! to aseguradora@rsm.com/Admin123! (and similar for reaseg/admin) so the prior 45-test pytest suite still runs.",
+    "Manually visually verify in browser: (a) marketplace pack detail as reaseguradora@rsm.com shows the 'Documento de presentación · pre-NCA' section with Download; (b) NewPack wizard Step 3 shows the previewFile uploader without crash; (c) OP-DEMO01 detail page (cedente) shows the timeline with quote=accepted and contract signed by both."
+  ],
+  "critical_code_review_comments": [
+    "_all_ncas_signed in /app/backend/routers/operations.py correctly references broker — tripartite logic in place.",
+    "/app/backend/routers/pack_files.py:list_pack_files exposes is_preview=true files to any authenticated reasegurador (locked=true mode) even when NCA not signed — exactly what E7 requires; also keeps freeze cutoff for closed ops working (A4 verified).",
+    "Spanish i18n confirmed at runtime: /api/auth/login wrong creds → 'Credenciales inválidas'; /api/interests duplicate → 'Ya has expresado interés en este pack'; /api/operations/{op}/sign-contract double sign → 'La cedente ya firmó el contrato'. No English leak detected.",
+    "Cedente aseguradora@rsm.com is at PACK_LIMIT (5 packs published) — seed creates 7 demo packs but per-cedente cap is 5; if the demo wants to publish more for testing, the cap or seed needs adjustment.",
+    "React duplicate-key console spam is a real issue and will slow down rendering; not crashing but should be fixed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter3_features.py (new — 10 feature-coverage tests)"
+  ],
+  "success_rate": {"backend": "100% (10/10 on iter3 suite; legacy iter2 suite needs cred update)", "frontend": "75% (OP-DEMO01 list view confirmed CERRADA; pack detail preview render not DOM-verified; React key warning observed)"},
+  "test_credentials": "From /app/memory/test_credentials.md: aseguradora@rsm.com / reaseguradora@rsm.com / broker@rsm.com / davide.resmini003@gmail.com — all Admin123!",
+  "seed_data_creation": "None new — tests rely on existing OP-DEMO01 + 7 demo packs already seeded by main agent. test_reasegurador_can_express_interest reuses an existing pack with own_interest=null (not OP-DEMO01's pack RSM-2026-1900).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter3 pytest in /app/backend/tests/test_iter3_features.py covers: Spanish i18n auth + interests + contract-sign, OP-DEMO01 D3 demo state, pre-NCA preview file presence + download via /api/pack-files/{id}/download (NOT /api/files/{id}/download), express-interest perm fix, tripartite _all_ncas_signed reference. Backend confirms reasegurador in closed op OP-DEMO01 still receives is_preview file via /api/submission-packs/{pack_id}/files (A4 freeze + E7 working). React duplicate-key warning across the app needs investigation by main agent. Legacy backend_test.py needs credential refresh.",
+  "rca of the issue": "No new bugs surfaced. The React duplicate-key warning likely stems from either (a) two fetches concurrently populating the same list state and merging without dedup, or (b) the same operation/pack being included twice (e.g., as cedente AND as broker). Look at Dashboard.jsx, OperationsList.jsx, or any .map(p => <Row key={p.id} />) where p.id can repeat."
+}

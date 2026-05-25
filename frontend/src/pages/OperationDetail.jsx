@@ -39,10 +39,15 @@ export default function OperationDetail() {
   // Match by user ID or by company (any user from the same company can sign)
   const isCedente = op.cedente_user_id === user.id || (userCompanyId && userCompanyId === op.cedente_company_id);
   const isRea = op.reasegurador_user_id === user.id || (userCompanyId && userCompanyId === op.reasegurador_company_id);
-  const isBroker = op.broker_user_id === user.id;
+  const isBroker = op.broker_user_id === user.id || (userCompanyId && userCompanyId === op.broker_company_id);
+  const hasBroker = !!op.broker_user_id;
 
-  const needsMySign = (isCedente && !op.nca_signed_cedente) || (isRea && !op.nca_signed_reasegurador);
-  const bothSigned = op.nca_signed_cedente && op.nca_signed_reasegurador;
+  const needsMySign =
+    (isCedente && !op.nca_signed_cedente) ||
+    (isRea && !op.nca_signed_reasegurador) ||
+    (hasBroker && isBroker && !op.nca_signed_broker);
+  const allSigned = op.nca_signed_cedente && op.nca_signed_reasegurador && (!hasBroker || op.nca_signed_broker);
+  const bothSigned = allSigned; // backwards-compat alias used downstream
 
   const counter = (() => {
     if (isCedente) return op.revealed ? op.reasegurador_company?.name : "Reasegurador anónimo";
@@ -72,7 +77,7 @@ export default function OperationDetail() {
         <Timeline state={op.state} />
       </div>
 
-      {op.state === "nca_pending" && !op.nca_signed_cedente && !op.nca_signed_reasegurador && (
+      {op.state === "nca_pending" && !op.nca_signed_cedente && !op.nca_signed_reasegurador && !op.nca_signed_broker && (
         <div className="mt-4 border border-[#FCD34D] bg-[#FFFBEB] px-5 py-4 flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <Lock size={16} className="text-[#92400E] mt-0.5 shrink-0" />
@@ -83,9 +88,11 @@ export default function OperationDetail() {
           <button className="rsm-btn-outline text-xs shrink-0" onClick={() => setTab("chat")}>Ir al chat</button>
         </div>
       )}
-      {op.state === "nca_pending" && (op.nca_signed_cedente !== op.nca_signed_reasegurador) && (
+      {op.state === "nca_pending" && !allSigned && (op.nca_signed_cedente || op.nca_signed_reasegurador || op.nca_signed_broker) && (
         <div className="mt-4 border-l-4 border-blue-400 bg-blue-50 px-5 py-3 text-sm text-blue-800">
-          Una parte ha firmado el NCA. Esperando la firma de la otra parte.
+          {hasBroker
+            ? "Algunas partes han firmado el NCA. Esperando las firmas restantes (cedente, reasegurador y broker)."
+            : "Una parte ha firmado el NCA. Esperando la firma de la otra parte."}
         </div>
       )}
 
@@ -215,7 +222,8 @@ function Overview({ op }) {
 
 function NcaSection({ op, needsMySign, bothSigned, onSign }) {
   const { t } = useI18n();
-  const noSignatures = !op.nca_signed_cedente && !op.nca_signed_reasegurador;
+  const hasBroker = !!op.broker_user_id;
+  const noSignatures = !op.nca_signed_cedente && !op.nca_signed_reasegurador && !op.nca_signed_broker;
   return (
     <div className="rsm-card">
       <div className="overline">{t("operation.nca_section")}</div>
@@ -228,7 +236,7 @@ function NcaSection({ op, needsMySign, bothSigned, onSign }) {
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+      <div className={`mt-4 grid ${hasBroker ? "grid-cols-3" : "grid-cols-2"} gap-4 text-sm`}>
         <div className="border border-[hsl(var(--border))] p-4">
           <div className="overline">Cedente</div>
           <div className="mt-2 font-mono-data">{op.nca_signed_cedente ? `✓ ${op.nca_signer_cedente}` : "—"}</div>
@@ -239,6 +247,13 @@ function NcaSection({ op, needsMySign, bothSigned, onSign }) {
           <div className="mt-2 font-mono-data">{op.nca_signed_reasegurador ? `✓ ${op.nca_signer_reasegurador}` : "—"}</div>
           <div className="text-xs text-slate-400 mt-1">{op.nca_signed_at_reasegurador ? new Date(op.nca_signed_at_reasegurador).toLocaleString() : ""}</div>
         </div>
+        {hasBroker && (
+          <div className="border border-[hsl(var(--border))] p-4">
+            <div className="overline">Broker</div>
+            <div className="mt-2 font-mono-data">{op.nca_signed_broker ? `✓ ${op.nca_signer_broker}` : "—"}</div>
+            <div className="text-xs text-slate-400 mt-1">{op.nca_signed_at_broker ? new Date(op.nca_signed_at_broker).toLocaleString() : ""}</div>
+          </div>
+        )}
       </div>
       {bothSigned && <div className="mt-4 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 p-3">{t("operation.both_signed")}</div>}
       {needsMySign && (
@@ -258,7 +273,7 @@ function QuoteSection({ op, user, reload }) {
     (userCompanyId && userCompanyId === op.reasegurador_company_id);
   const isCedente = op.cedente_user_id === user.id ||
     (userCompanyId && userCompanyId === op.cedente_company_id);
-  const both = op.nca_signed_cedente && op.nca_signed_reasegurador;
+  const both = op.nca_signed_cedente && op.nca_signed_reasegurador && (!op.broker_user_id || op.nca_signed_broker);
   const [showForm, setShowForm] = useState(false);
   const q0 = op.quote;
   const [form, setForm] = useState({

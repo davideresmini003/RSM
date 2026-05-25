@@ -12,7 +12,7 @@ router = APIRouter()
 async def register(payload: RegisterIn, request: Request, response: Response):
     email = payload.email.lower()
     if payload.role not in ("cedente", "reasegurador", "broker"):
-        raise HTTPException(status_code=400, detail="Invalid role")
+        raise HTTPException(status_code=400, detail="Rol inválido")
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="Email already registered")
     user_id = str(uuid.uuid4())
@@ -39,7 +39,7 @@ async def login(payload: LoginIn, request: Request, response: Response):
     email = payload.email.lower()
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(payload.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
     token = create_token(user["id"], user["email"], user["role"])
     set_token_cookie(response, token)
     await audit("user.login", user, "user", user["id"], request=request)

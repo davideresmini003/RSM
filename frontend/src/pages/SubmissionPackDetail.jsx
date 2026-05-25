@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { api, formatApiError } from "../lib/api";
+import { api, API, formatApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { VerifiedBadge, AnonBadge, LossRatioPill } from "../components/ui-bits";
@@ -13,6 +13,7 @@ export default function SubmissionPackDetail() {
   const { t } = useI18n();
   const nav = useNavigate();
   const [pack, setPack] = useState(null);
+  const [previewFiles, setPreviewFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
   const [err, setErr] = useState("");
@@ -25,6 +26,11 @@ export default function SubmissionPackDetail() {
     try {
       const { data } = await api.get(`/marketplace/packs/${id}`);
       setPack(data.pack);
+      // Fetch any preview files attached to this pack (visible pre-NCA)
+      try {
+        const { data: filesData } = await api.get(`/submission-packs/${id}/files`);
+        setPreviewFiles((filesData.files || []).filter((f) => f.is_preview));
+      } catch (_) { setPreviewFiles([]); }
     } catch (e) {
       setErr(formatApiError(e.response?.data?.detail) || e.message);
     } finally {
@@ -161,6 +167,34 @@ export default function SubmissionPackDetail() {
         <div className="rsm-card mt-6">
           <div className="overline mb-3">Descripción del riesgo</div>
           <p className="text-base leading-relaxed text-slate-700 whitespace-pre-line">{pack.description}</p>
+        </div>
+      )}
+
+      {/* PREVIEW documents — visible BEFORE NCA */}
+      {previewFiles.length > 0 && (
+        <div className="rsm-card mt-6 border-l-4 border-[#0B132B]">
+          <div className="overline text-[#0B132B] mb-3">Documento de presentación · pre-NCA</div>
+          <p className="text-xs text-slate-500 mb-4">
+            La cedente ha adjuntado un documento informativo accesible <b>antes</b> de firmar el NCA, para ayudarte a decidir si expresar interés.
+          </p>
+          <div className="space-y-2">
+            {previewFiles.map((pf) => (
+              <div key={pf.id} className="flex items-center justify-between border border-[hsl(var(--border))] p-3 text-sm">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText size={14} className="text-slate-400 shrink-0" strokeWidth={1.5} />
+                  <span className="truncate">{pf.filename}</span>
+                  <span className="text-xs text-slate-400 font-mono-data shrink-0">({(pf.size / 1024).toFixed(1)} KB)</span>
+                </div>
+                <a
+                  href={`${API}/pack-files/${pf.id}/download`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="overline text-[#0B132B] hover:text-[#D32F2F] shrink-0 ml-3"
+                  data-testid={`preview-pack-file-${pf.id}`}
+                >Descargar →</a>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

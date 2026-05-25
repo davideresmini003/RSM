@@ -35,17 +35,17 @@ def _operation_visibility(op: dict, user: dict) -> dict:
 async def express_interest(payload: InterestIn, request: Request, user: dict = Depends(require_role("reasegurador"))):
     pack = await db.submission_packs.find_one({"id": payload.pack_id, "status": "published"})
     if not pack:
-        raise HTTPException(status_code=404, detail="Pack not available")
+        raise HTTPException(status_code=404, detail="Pack no disponible")
     # Bug 3: require verified company for expressing interest
     company = await db.companies.find_one({"id": user.get("company_id")}) if user.get("company_id") else None
     if not company or not company.get("verified"):
         raise HTTPException(status_code=403, detail="Tu empresa debe estar verificada para expresar interés en operaciones")
     exists = await db.interests.find_one({"pack_id": payload.pack_id, "reasegurador_user_id": user["id"]})
     if exists:
-        raise HTTPException(status_code=400, detail="Already expressed interest")
+        raise HTTPException(status_code=400, detail="Ya has expresado interés en este pack")
     pending_count = await db.interests.count_documents({"reasegurador_user_id": user["id"], "status": "pending"})
     if pending_count >= 10:
-        raise HTTPException(status_code=400, detail="Max 10 pending interests")
+        raise HTTPException(status_code=400, detail="Máximo 10 intereses pendientes")
     interest = {
         "id": str(uuid.uuid4()),
         "pack_id": payload.pack_id,
@@ -95,13 +95,13 @@ async def respond_interest(interest_id: str, body: dict, request: Request, user:
     if not interest or interest["cedente_user_id"] != user["id"]:
         raise HTTPException(status_code=404)
     if interest["status"] != "pending":
-        raise HTTPException(status_code=400, detail="Already responded")
+        raise HTTPException(status_code=400, detail="Ya respondido")
     if action == "reject":
         await db.interests.update_one({"id": interest_id}, {"$set": {"status": "rejected"}})
         await audit("interest.reject", user, "interest", interest_id, request=request)
         return {"ok": True}
     if action != "accept":
-        raise HTTPException(status_code=400, detail="Invalid action")
+        raise HTTPException(status_code=400, detail="Acción inválida")
     pack = await db.submission_packs.find_one({"id": interest["pack_id"]})
     operation = {
         "id": str(uuid.uuid4()),
@@ -285,7 +285,7 @@ async def submit_quote(op_id: str, payload: QuoteIn, request: Request, user: dic
     if not op or not (is_rea or is_cedente):
         raise HTTPException(status_code=403)
     if not _all_ncas_signed(op):
-        raise HTTPException(status_code=400, detail="NCA not fully signed")
+        raise HTTPException(status_code=400, detail="El NCA aún no está completamente firmado")
     # Bug 14: enforce minimum A- rating for reaseguradores sending quotes
     if is_rea and not is_cedente:
         VALID_RATINGS = {"A-", "A", "A+", "AA-", "AA", "AA+", "AAA",
@@ -305,6 +305,9 @@ async def submit_quote(op_id: str, payload: QuoteIn, request: Request, user: dic
         existing = await db.quotes.find_one({"id": op["quote_id"]})
         if existing and existing.get("accepted"):
             raise HTTPException(status_code=400, detail="La cotización ya fue aceptada — el contrato está en curso")
+        # A2: prevent the same party from spamming back-to-back quotes when one is already pending
+        if existing and not existing.get("accepted") and existing.get("sender_role") == user_role:
+            raise HTTPException(status_code=400, detail="Ya enviaste una cotización; espera la respuesta de la contraparte antes de enviar otra")
     quote = {
         "id": str(uuid.uuid4()),
         "operation_id": op_id,
@@ -342,17 +345,17 @@ async def accept_quote(op_id: str, request: Request, user: dict = Depends(get_cu
         raise HTTPException(status_code=404)
     quote = await db.quotes.find_one({"id": op.get("quote_id")}) if op.get("quote_id") else None
     if not quote:
-        raise HTTPException(status_code=400, detail="No quote")
+        raise HTTPException(status_code=400, detail="No hay cotización para aceptar")
     # Bug 2: race-condition guard — atomic accept on the quote document itself
     if quote.get("accepted"):
         raise HTTPException(status_code=400, detail="Esta cotización ya fue aceptada")
     sender_role = quote.get("sender_role", "")
     if is_cedente and sender_role == "cedente":
-        raise HTTPException(status_code=403, detail="Cannot accept your own quote")
+        raise HTTPException(status_code=403, detail="No puedes aceptar tu propia cotización")
     if is_rea and sender_role == "reasegurador":
-        raise HTTPException(status_code=403, detail="Cannot accept your own quote")
+        raise HTTPException(status_code=403, detail="No puedes aceptar tu propia cotización")
     if op.get("contract_id"):
-        raise HTTPException(status_code=400, detail="Quote already accepted")
+        raise HTTPException(status_code=400, detail="La cotización ya fue aceptada")
     await db.quotes.update_one({"id": op["quote_id"]}, {"$set": {"accepted": True, "accepted_at": now_iso()}})
     contract = {
         "id": str(uuid.uuid4()),
@@ -387,18 +390,18 @@ async def sign_contract(op_id: str, payload: NcaSignIn, request: Request, user: 
     update = {}
     if is_cedente:
         if contract.get("signed_cedente"):
-            raise HTTPException(status_code=400, detail="Already signed")
+            raise HTTPException(status_code=400, detail="La cedente ya firmó el contrato")
         update["signed_cedente"] = True
         update["signed_at_cedente"] = now_iso()
         update["signer_cedente"] = payload.signer_name
     elif is_rea:
         if contract.get("signed_reasegurador"):
-            raise HTTPException(status_code=400, detail="Already signed")
+            raise HTTPException(status_code=400, detail="El reasegurador ya firmó el contrato")
         update["signed_reasegurador"] = True
         update["signed_at_reasegurador"] = now_iso()
         update["signer_reasegurador"] = payload.signer_name
     else:
-        raise HTTPException(status_code=403)
+        raise HTTPException(status_code=403, detail="No autorizado para firmar este contrato")
     await db.contracts.update_one({"id": op["contract_id"]}, {"$set": update})
     contract = await db.contracts.find_one({"id": op["contract_id"]})
     if contract.get("signed_cedente") and contract.get("signed_reasegurador"):
@@ -472,7 +475,7 @@ async def get_messages(op_id: str, channel: str, user: dict = Depends(get_curren
     if role == "admin":
         allowed_channels.update({"documents", "cedente-reasegurador", "broker-cedente", "broker-reasegurador"})
     if channel not in allowed_channels:
-        raise HTTPException(status_code=403, detail="Channel not available")
+        raise HTTPException(status_code=403, detail="Canal no disponible")
     both_signed = _all_ncas_signed(op)
     msgs = await db.messages.find({"operation_id": op_id, "channel": channel}, {"_id": 0}).sort("created_at", 1).to_list(500)
     # Anonymize sender names until both parties sign NCA
@@ -528,6 +531,7 @@ async def send_message(payload: MessageIn, request: Request, user: dict = Depend
         "sender_name": user.get("name"),
         "text": payload.text,
         "created_at": now_iso(),
+        "read_by": [user["id"]],
     }
     await db.messages.insert_one(msg)
     await audit("message.send", user, "operation", payload.operation_id, meta={"channel": channel}, request=request)
@@ -584,6 +588,7 @@ async def send_message_with_file(
         "sender_name": user.get("name"),
         "text": text,
         "created_at": now_iso(),
+        "read_by": [user["id"]],
         "attachment": None,
     }
     if file and file.filename:
