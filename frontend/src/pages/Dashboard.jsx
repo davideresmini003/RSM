@@ -64,7 +64,14 @@ function CedenteDashboard({ stats, userId }) {
       const pending = all.filter((m) => m.nca_signed_broker && !m.nca_signed_cedente);
       const active = all.filter((m) => m.nca_signed_broker && m.nca_signed_cedente);
       setPendingMandates(pending);
-      setActiveBrokers(active);
+      // Dedupe by broker_id (cedente may have multiple mandates with same broker)
+      const seen = new Set();
+      const uniqueActive = active.filter((m) => {
+        if (seen.has(m.broker_id)) return false;
+        seen.add(m.broker_id);
+        return true;
+      });
+      setActiveBrokers(uniqueActive);
     }).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load, userId]);

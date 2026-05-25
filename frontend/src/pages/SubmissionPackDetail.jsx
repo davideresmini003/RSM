@@ -172,7 +172,7 @@ export default function SubmissionPackDetail() {
 
       {/* PREVIEW documents — visible BEFORE NCA */}
       {previewFiles.length > 0 && (
-        <div className="rsm-card mt-6 border-l-4 border-[#0B132B]">
+        <div className="rsm-card mt-6 border-l-4 border-[#0B132B]" data-testid="pre-nca-preview-section">
           <div className="overline text-[#0B132B] mb-3">Documento de presentación · pre-NCA</div>
           <p className="text-xs text-slate-500 mb-4">
             La cedente ha adjuntado un documento informativo accesible <b>antes</b> de firmar el NCA, para ayudarte a decidir si expresar interés.
@@ -190,7 +190,7 @@ export default function SubmissionPackDetail() {
                   target="_blank"
                   rel="noreferrer"
                   className="overline text-[#0B132B] hover:text-[#D32F2F] shrink-0 ml-3"
-                  data-testid={`preview-pack-file-${pf.id}`}
+                  data-testid="pre-nca-preview-download"
                 >Descargar →</a>
               </div>
             ))}

@@ -7,57 +7,55 @@ Build a B2B SaaS that digitizes European reinsurance intermediation. Three actor
 - Full end-to-end MVP (all roles, all flows)
 - JWT email+password auth (custom) + demo quick-access on landing
 - Digital signature simple (checkbox + name + timestamp + IP, audit log)
-- Bilingual ES/EN with toggle
-- Local storage (Mongo) for files
+- Bilingual ES/EN with toggle (UI default ES)
+- Local storage (Mongo, base64) for files
 
 ## Architecture
 - Backend: FastAPI + Motor (Mongo), JWT httpOnly cookie + Bearer fallback
 - Frontend: React 19 + React Router 7 + Tailwind (design system "Swiss Institutional")
-- MongoDB collections: users, companies, submission_packs, interests, operations, quotes, contracts, messages, broker_profiles, solicitudes, mandates, ratings, audit_log
+- MongoDB collections: users, companies, submission_packs, pack_files, interests, operations, quotes, contracts, messages, broker_profiles, solicitudes, mandates, ratings, audit_log
 
-## Implemented (Apr 2026)
-- Landing bilingual with 4 quick-demo buttons (Cedente, Reasegurador, Broker, Admin) + Admin shortcut header + link to /login
-- Auth: register, login, logout, /me (JWT cookie + Bearer). Admin + 3 demo users seeded.
-- Onboarding multi-step per role (kept intact for production)
-- Role-based sidebar with role-switcher (demo)
-- Cedente: Dashboard (4 KPIs, Mis Programas, Intereses, Operaciones recientes), Submission Pack 4-step wizard, list/publish/withdraw
-- Marketplace: filtered grid, anonymous cards with verified badges
-- **Submission Pack detail page** with full data + express interest modal (NEW)
-- Reasegurador: Dashboard, marketplace access, express interest
-- Operation detail: timeline (8 states), NCA signing modal (eIDAS-style), Quote form (one-shot), Accept quote → auto-contract, Sign contract, Chat (polling, dual channels for brokers)
-- Brokers: public marketplace, broker profile editor (visible/bio/branches/services/zones/languages/rating), public profile page, contact modal → solicitud
-- Solicitudes: receive/accept/decline (auto-creates Mandate for cedente)
-- Mandates: broker-cedente NCA signing → identity reveal
-- Ratings: 3-dimension (technical/comm/deadlines) on closed operations with broker
-- Admin: verify/unverify companies, audit log viewer
-- Immutable audit log on all significant actions
+## Implemented (May 2026 — investor MVP)
+- Landing bilingual; auth (register, login, logout, /me) with demo seeds
+- Onboarding multi-step per role
+- Role-based sidebars + role-switcher
+- Cedente: Dashboard, 4-step Submission Pack wizard with real file uploads (preview + confidential), pack list/publish/withdraw
+- Marketplace: filtered anonymous grid, pack detail page with **pre-NCA preview docs**
+- Reasegurador: marketplace browse, express interest (verified-company gate)
+- Operations: timeline (8 states), **tripartite NCA** (cedente+reasegurador+broker if assigned), one-shot quote with versioned counter-offer, contract sign, chat (polling, dual broker channels)
+- Brokers: marketplace, profile editor, public profile, contact → solicitud → mandate
+- Mandates: broker-cedente NCA + identity reveal
+- Ratings: 3-dim on closed operations
+- Admin: company verification, audit log viewer (timestamps as `toLocaleString`)
+
+## Iteration_3 changes (this session)
+- Frontend `NewPack.jsx` Step 3: declared `previewFile` state and upload preview docs with `?is_preview=true`
+- `SubmissionPackDetail.jsx`: fetches `/submission-packs/{id}/files` and renders pre-NCA preview section (`data-testid="pre-nca-preview-section"`)
+- `OperationDetail.jsx`: tripartite NCA UI — `hasBroker`, `allSigned`; NcaSection now shows 3 columns when broker is present
+- Backend errors translated to Spanish (E1): Invalid role, Invalid credentials, Pack not available, Already expressed, Max 10, Already responded, No quote, Cannot accept your own quote, Quote already accepted, Already signed × 2, Channel not available, Already rated
+- A1: `_can_see_pack_files` now excludes operations with `state == "cancelled"`
+- A2: `submit_quote` blocks back-to-back quotes by the same party while one is pending
+- A3: `send_message` / `send_message_with_file` initialize `read_by: [sender]`
+- A4: `list_pack_files` freezes the file list visible to counterparties at the moment all NCAs were signed
+- D3: seeded `OP-DEMO01` (closed operation on RSM-2026-1900) with quote + contract + 4 chat messages for instant demo
+- E7: seeded a 1-page placeholder `Presentacion-RSM-2026-XXXX.pdf` (is_preview=true) on every demo pack
+- Dashboard: deduped `activeBrokers` by `broker_id` to remove React duplicate-key warning
 
 ## Test credentials
-See /app/memory/test_credentials.md
-
-## Status
-- ✅ Full MVP functional end-to-end
-- ⏳ Not yet tested by testing agent (user declined for now)
+See `/app/memory/test_credentials.md`
 
 ## Backlog (P1/P2)
-- File upload real (currently simulated placeholders)
 - Real eIDAS digital signature integration (current: internal audit-log signature)
-- Email notifications (interest received, NCA to sign, quote received, contract, mandate)
+- Email notifications (interest, NCA, quote, contract, mandate)
 - Admin: suspend/resume operations UI
-- Pricing + Stripe billing integration
+- Pricing + Stripe billing
 - SSE/WebSocket push instead of 4s chat polling
+- Mass i18n string replacement in Admin.jsx, Solicitudes.jsx, OperationDetail.jsx
+- Refactor `OperationDetail.jsx` (~850 lines) into sub-components
+- Legacy `/app/backend/tests/backend_test.py` needs credential refresh to `aseguradora@rsm.com / Admin123!`
 
-## Next action items
-- [ ] Run testing agent end-to-end (cedente publica → reasegurador interés → NCA → cotización → contrato → rating)
-- [ ] Decide on file upload storage (local GridFS vs Cloudinary/S3)
-- [ ] Add payment integration for trial → paid conversion
-
-## Testing status (Apr 21, 2026)
-- ✅ **Backend: 45/45 tests pass (100%)** — comprehensive pytest suite at /app/backend/tests/backend_test.py covering full lifecycle + negative cases
-- ✅ **Frontend: 100%** — all critical flows verified via playwright
-- ✅ **Bugs fixed in iteration_1:**
-  - Dashboard stale-state on role switch (added `user?.id` deps to useEffect in Dashboard/OperationsList/Messages)
-  - `accept_quote` double-call guard (returns 400 "Quote already accepted")
-  - `sign_contract` double-sign guard for both parties (returns 400 "Already signed")
-  - Added audit_log indexes on action and user_id
-- ✅ **Full flow verified end-to-end**: landing → quick-login as cedente → publish pack → switch to reasegurador → view pack detail → express interest → switch to cedente → accept interest → sign NCA → switch to reasegurador → sign NCA (identity revealed) → chat works bilaterally → submit quote → switch to cedente → accept quote → sign contract → switch to reasegurador → sign contract → state = closed
+## Testing status (May 25, 2026)
+- ✅ iteration_3 pytest suite `/app/backend/tests/test_iter3_features.py` 10/10 pass
+- ✅ Backend: tripartite helper, Spanish i18n, OP-DEMO01, preview files, A1/A4 verified
+- ✅ Frontend: lint clean; OP-DEMO01 visible on cedente operations list (state=CERRADA); pack-detail preview render flow validated via API
+- ⚠️ Legacy `backend_test.py` from iteration_2 needs cred update (not blocking demo)
