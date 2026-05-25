@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
-import { ShieldCheck, Fingerprint, FileClock, Lock, ArrowRight, Building2, Languages } from "lucide-react";
+import { ShieldCheck, Fingerprint, FileClock, Lock, ArrowRight, Building2, Languages, BadgeCheck, Scale, Globe, FileKey } from "lucide-react";
 
 export default function Landing() {
   const { t, lang, setLang } = useI18n();
@@ -127,36 +127,57 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Commission model */}
       <section className="py-24 sm:py-32 border-b border-[hsl(var(--border))]">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="overline text-center mb-4">Pricing</div>
+          <div className="overline text-center mb-4">Modelo de negocio</div>
           <h2 className="font-display text-3xl sm:text-5xl font-semibold text-center tracking-tighter">{t("landing.pricing_title")}</h2>
           <p className="text-center text-slate-500 mt-4 max-w-2xl mx-auto">{t("landing.pricing_sub")}</p>
           <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-0 border-l border-t border-[hsl(var(--border))]">
             {[
-              { role: "cedente", price: t("landing.price_cedente"), desc: t("landing.role_cedente_desc") },
-              { role: "reasegurador", price: t("landing.price_reasegurador"), desc: t("landing.role_reasegurador_desc"), highlighted: true },
-              { role: "broker", price: t("landing.price_broker"), desc: t("landing.role_broker_desc") },
+              {
+                key: "cedente",
+                title: t("landing.commission_cedente_title"),
+                price: t("landing.commission_cedente_price"),
+                sub: t("landing.commission_cedente_sub"),
+                desc: t("landing.commission_cedente_desc"),
+                highlighted: false,
+              },
+              {
+                key: "reasegurador",
+                title: t("landing.commission_reas_title"),
+                price: t("landing.commission_reas_price"),
+                sub: t("landing.commission_reas_sub"),
+                desc: t("landing.commission_reas_desc"),
+                highlighted: true,
+              },
+              {
+                key: "broker",
+                title: t("landing.commission_broker_title"),
+                price: t("landing.commission_broker_price"),
+                sub: t("landing.commission_broker_sub"),
+                desc: t("landing.commission_broker_desc"),
+                highlighted: false,
+              },
             ].map((p) => (
               <div
-                key={p.role}
+                key={p.key}
                 className={`border-r border-b border-[hsl(var(--border))] p-8 flex flex-col ${p.highlighted ? "bg-[#0B132B] text-white" : "bg-white"}`}
-                data-testid={`pricing-${p.role}`}
+                data-testid={`pricing-${p.key}`}
               >
                 <Building2 size={24} strokeWidth={1.25} className={p.highlighted ? "text-[#D32F2F]" : "text-[#0B132B]"} />
-                <div className={`overline mt-6 ${p.highlighted ? "text-slate-400" : ""}`}>{t(`roles.${p.role}`)}</div>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <div className="font-display text-5xl font-semibold tracking-tighter">{p.price}</div>
-                  <div className={`text-sm ${p.highlighted ? "text-slate-400" : "text-slate-500"}`}>{t("landing.per_month")}</div>
+                <div className={`overline mt-6 ${p.highlighted ? "text-slate-400" : ""}`}>{p.title}</div>
+                <div className="mt-4">
+                  <div className={`font-display text-3xl font-semibold tracking-tighter ${p.highlighted ? "text-white" : "text-[#0B132B]"}`}>{p.price}</div>
+                  <div className={`text-xs mt-1 uppercase tracking-wider font-semibold ${p.highlighted ? "text-[#D32F2F]" : "text-slate-500"}`}>{p.sub}</div>
                 </div>
                 <p className={`mt-6 text-sm leading-relaxed flex-1 ${p.highlighted ? "text-slate-300" : "text-slate-600"}`}>{p.desc}</p>
                 <Link
-                  to={`/register?role=${p.role}`}
-                  className={`mt-8 text-center py-3 text-xs font-semibold uppercase tracking-wider ${p.highlighted ? "bg-[#D32F2F] text-white hover:bg-[#b71c1c]" : "bg-[#0B132B] text-white hover:bg-[#1a2447]"} transition-colors`}
-                  data-testid={`pricing-cta-${p.role}`}
+                  to={`/register?role=${p.key}`}
+                  className={`mt-8 text-center py-3 text-xs font-semibold uppercase tracking-wider transition-colors ${p.highlighted ? "bg-[#D32F2F] text-white hover:bg-[#b71c1c]" : "bg-[#0B132B] text-white hover:bg-[#1a2447]"}`}
+                  data-testid={`pricing-cta-${p.key}`}
                 >
-                  {t("landing.start_trial")}
+                  {t("landing.cta_register")}
                 </Link>
               </div>
             ))}
@@ -164,10 +185,36 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Regulatory compliance */}
+      <section className="py-20 bg-[#F8FAFC] border-b border-[hsl(var(--border))]">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="overline mb-4">{t("landing.regulatory_title")}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-0 border-l border-t border-[hsl(var(--border))]">
+            {[
+              { icon: BadgeCheck, text: t("landing.regulatory_dgsfp") },
+              { icon: Scale, text: t("landing.regulatory_solvency") },
+              { icon: Globe, text: t("landing.regulatory_eiopa") },
+              { icon: FileKey, text: t("landing.regulatory_eiadas") },
+            ].map(({ icon: Icon, text }) => (
+              <div key={text} className="border-r border-b border-[hsl(var(--border))] p-6 flex gap-4">
+                <Icon size={20} strokeWidth={1.25} className="text-[#D32F2F] shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-600 leading-relaxed">{text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <footer className="py-12 bg-[#0B132B] text-slate-400 text-xs">
-        <div className="max-w-7xl mx-auto px-6 flex flex-wrap items-center justify-between gap-4">
-          <div className="font-display text-xl font-semibold text-white">RSM</div>
-          <div className="overline">{t("landing.footer")}</div>
+        <div className="max-w-7xl mx-auto px-6 flex flex-wrap items-center justify-between gap-6">
+          <div>
+            <div className="font-display text-xl font-semibold text-white">RSM</div>
+            <div className="mt-1 overline text-slate-500">Reinsurance Solutions & Management SL</div>
+          </div>
+          <div className="space-y-1 text-right">
+            <div className="overline">{t("landing.footer")}</div>
+            <div className="text-slate-500">Nº Reg. DGSFP: J-XXXX · EIOPA ID: ES-XXXX</div>
+          </div>
         </div>
       </footer>
     </div>

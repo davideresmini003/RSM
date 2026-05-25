@@ -28,9 +28,9 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center p-8 bg-[#F8FAFC]" data-testid="register-page">
       <div className="w-full max-w-xl bg-white border border-[hsl(var(--border))] p-10">
         <Link to="/" className="font-display text-2xl font-bold text-[#0B132B]">RSM</Link>
-        <div className="overline mt-6 mb-2">New account</div>
+        <div className="overline mt-6 mb-2">{t("ops_list.new_account")}</div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Crear cuenta</h1>
-        <p className="text-sm text-slate-500 mt-2">Selecciona tu rol. 30 días de prueba gratis.</p>
+        <p className="text-sm text-slate-500 mt-2">Selecciona tu rol. Acceso libre — comisión solo en operaciones cerradas.</p>
 
         <div className="mt-8 grid grid-cols-3 gap-0 border-l border-t border-[hsl(var(--border))]">
           {["cedente", "reasegurador", "broker"].map((r) => (
@@ -51,15 +51,15 @@ export default function Register() {
         <form onSubmit={submit} className="mt-6 space-y-5">
           <div>
             <label className="rsm-label">{t("common.name")}</label>
-            <input className="rsm-input" value={name} onChange={(e) => setName(e.target.value)} required data-testid="reg-name" />
+            <input className="rsm-input" value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} required data-testid="reg-name" />
           </div>
           <div>
             <label className="rsm-label">{t("common.email")}</label>
-            <input className="rsm-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required data-testid="reg-email" />
+            <input className="rsm-input" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErr(""); }} required data-testid="reg-email" />
           </div>
           <div>
             <label className="rsm-label">{t("common.password")}</label>
-            <input className="rsm-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} data-testid="reg-password" />
+            <input className="rsm-input" type="password" value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} required minLength={6} data-testid="reg-password" />
           </div>
           {err && <div className="text-xs text-[#D32F2F] border border-[#D32F2F] bg-red-50 p-3" data-testid="reg-error">{err}</div>}
           <button className="rsm-btn-primary w-full" disabled={loading} data-testid="reg-submit">

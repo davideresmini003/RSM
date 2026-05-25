@@ -1,38 +1,70 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
 import { useI18n } from "../lib/i18n";
-import { AlertTriangle } from "lucide-react";
+import { useAuth } from "../lib/auth";
+import { AlertTriangle, CircleDot, Star, Check } from "lucide-react";
 
 const BRANCHES = ["Property", "Casualty", "Marina", "Aviación", "Vida", "Salud", "Motor", "RC", "Ingeniería", "Agricultura", "Crédito", "Otro"];
 const TYPES = ["Excess of Loss", "Quota Share", "Surplus", "Proporcional", "No proporcional", "Facultativo", "Treaty"];
 
 export default function NewPack() {
   const { t } = useI18n();
+  const { company } = useAuth();
   const nav = useNavigate();
   const [step, setStep] = useState(1);
   const [err, setErr] = useState("");
   const [confirm, setConfirm] = useState(false);
+  const [useBroker, setUseBroker] = useState(null); // null | false | true
+  const [brokers, setBrokers] = useState([]);
+  const [loadingBrokers, setLoadingBrokers] = useState(false);
   const [f, setF] = useState({
     title: "", branch: "Property", reinsurance_type: "Excess of Loss",
     country_region: "", coverage_period: "", cession_pct: 30,
     premiums_y1: 0, premiums_y2: 0, premiums_y3: 0,
     loss_ratio_y1: 0, loss_ratio_y2: 0, loss_ratio_y3: 0,
-    description: "",
+    description: "", broker_id: null,
   });
   const upd = (k, v) => setF((x) => ({ ...x, [k]: v }));
+
+  useEffect(() => {
+    if (useBroker && brokers.length === 0) {
+      setLoadingBrokers(true);
+      api.get("/marketplace/brokers")
+        .then(({ data }) => setBrokers(data.brokers || []))
+        .finally(() => setLoadingBrokers(false));
+    }
+  }, [useBroker]);
+
+  const canNext = () => {
+    if (step === 1) {
+      if (!f.title.trim()) return false;
+      if (useBroker === null) return false;
+      if (useBroker === true && !f.broker_id) return false;
+    }
+    return true;
+  };
 
   const save = async (status) => {
     if (status === "published" && !confirm) { setErr("Marca la casilla de confirmación."); return; }
     try {
-      const payload = { ...f, status, cession_pct: Number(f.cession_pct) || 0,
+      const payload = {
+        ...f,
+        broker_id: useBroker ? f.broker_id : null,
+        status,
+        cession_pct: Number(f.cession_pct) || 0,
         premiums_y1: Number(f.premiums_y1) || 0, premiums_y2: Number(f.premiums_y2) || 0, premiums_y3: Number(f.premiums_y3) || 0,
         loss_ratio_y1: Number(f.loss_ratio_y1) || 0, loss_ratio_y2: Number(f.loss_ratio_y2) || 0, loss_ratio_y3: Number(f.loss_ratio_y3) || 0,
       };
       await api.post("/submission-packs", payload);
       nav("/app");
     } catch (e) {
-      setErr(formatApiError(e.response?.data?.detail) || e.message);
+      const detail = e.response?.data?.detail || "";
+      if (typeof detail === "string" && detail.startsWith("PACK_LIMIT:")) {
+        setErr("PACK_LIMIT");
+      } else {
+        setErr(formatApiError(detail) || e.message);
+      }
     }
   };
 
@@ -46,6 +78,7 @@ export default function NewPack() {
         ))}
       </div>
       <div className="bg-white border border-[hsl(var(--border))] p-8">
+
         {step === 1 && (
           <div className="space-y-5">
             <div className="overline">{t("pack.step1")}</div>
@@ -59,7 +92,84 @@ export default function NewPack() {
               <F label={t("pack.f_period")} value={f.coverage_period} onChange={(v) => upd("coverage_period", v)} placeholder="01/01/2026 – 31/12/2026" />
             </div>
             <F type="number" label={t("pack.f_cession") + " (%)"} value={f.cession_pct} onChange={(v) => upd("cession_pct", v)} />
-            <div className="border-l-4 border-[#FCD34D] bg-[#FFFBEB] p-4 text-xs flex gap-3"><AlertTriangle size={16} className="shrink-0 text-[#92400E]" strokeWidth={1.5} /><span>{t("pack.warning_anon")}</span></div>
+            <div className="border-l-4 border-[#FCD34D] bg-[#FFFBEB] p-4 text-xs flex gap-3">
+              <AlertTriangle size={16} className="shrink-0 text-[#92400E]" strokeWidth={1.5} />
+              <span>{t("pack.warning_anon")}</span>
+            </div>
+
+            {/* Broker selection */}
+            <div className="border border-[hsl(var(--border))] p-5">
+              <div className="overline mb-3">¿Deseas delegar la gestión a un broker?</div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setUseBroker(false); upd("broker_id", null); }}
+                  className={`flex-1 border-2 p-4 text-left transition-colors ${useBroker === false ? "border-[#0B132B] bg-[#0B132B] text-white" : "border-[hsl(var(--border))] hover:border-slate-400"}`}
+                  data-testid="no-broker-btn"
+                >
+                  <div className="font-semibold text-sm">Sin broker</div>
+                  <div className={`text-xs mt-1 ${useBroker === false ? "text-slate-300" : "text-slate-500"}`}>
+                    Publicas el pack y cualquier broker puede contactarte para ofrecerte sus servicios.
+                  </div>
+                </button>
+                <button
+                  onClick={() => setUseBroker(true)}
+                  className={`flex-1 border-2 p-4 text-left transition-colors ${useBroker === true ? "border-[#0B132B] bg-[#0B132B] text-white" : "border-[hsl(var(--border))] hover:border-slate-400"}`}
+                  data-testid="with-broker-btn"
+                >
+                  <div className="font-semibold text-sm">Con broker específico</div>
+                  <div className={`text-xs mt-1 ${useBroker === true ? "text-slate-300" : "text-slate-500"}`}>
+                    Selecciona un broker del marketplace y le enviamos una solicitud de colaboración.
+                  </div>
+                </button>
+              </div>
+
+              {useBroker === true && (
+                <div className="mt-4">
+                  <div className="rsm-label mb-3">Selecciona un broker *</div>
+                  {loadingBrokers ? (
+                    <div className="text-slate-400 text-sm py-4 text-center">{t("common.loading")}</div>
+                  ) : brokers.length === 0 ? (
+                    <div className="text-slate-400 text-sm py-4 text-center">No hay brokers disponibles en el marketplace.</div>
+                  ) : (
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                      {brokers.map((b) => (
+                        <button
+                          key={b.broker_user_id}
+                          onClick={() => upd("broker_id", b.broker_user_id)}
+                          className={`w-full border p-3 text-left transition-colors flex items-start gap-3 ${f.broker_id === b.broker_user_id ? "border-[#0B132B] bg-slate-50" : "border-[hsl(var(--border))] hover:border-slate-400"}`}
+                          data-testid={`select-broker-${b.broker_user_id}`}
+                        >
+                          <div className={`w-4 h-4 shrink-0 mt-0.5 border-2 rounded-full flex items-center justify-center ${f.broker_id === b.broker_user_id ? "border-[#0B132B] bg-[#0B132B]" : "border-slate-300"}`}>
+                            {f.broker_id === b.broker_user_id && <Check size={9} strokeWidth={3} className="text-white" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm">{b.company_name}</span>
+                              <AvailabilityDot value={b.availability} />
+                            </div>
+                            <div className="text-xs text-slate-500 mt-0.5">{b.broker_name} · {b.country}</div>
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {(b.branches || []).slice(0, 3).map((br) => (
+                                <span key={br} className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 bg-slate-100 border border-[hsl(var(--border))]">{br}</span>
+                              ))}
+                            </div>
+                            {b.rating_avg && (
+                              <div className="flex items-center gap-1 mt-1.5 text-xs text-slate-500">
+                                <Star size={11} strokeWidth={1.5} />
+                                <span>{b.rating_avg}/5 ({b.ratings_count} valoraciones)</span>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {useBroker === true && !f.broker_id && (
+                    <p className="text-xs text-slate-400 mt-2">Debes seleccionar un broker para continuar.</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -106,6 +216,12 @@ export default function NewPack() {
         {step === 4 && (
           <div className="space-y-5">
             <div className="overline">{t("pack.step4")}</div>
+            {company && !company.verified && (
+              <div className="border-l-4 border-[#D32F2F] bg-red-50 p-4 text-xs flex gap-3">
+                <AlertTriangle size={16} className="shrink-0 text-[#D32F2F] mt-0.5" strokeWidth={1.5} />
+                <span className="text-[#D32F2F]">Tu empresa está pendiente de verificación por el administrador RSM. Puedes guardar el borrador, pero no podrás publicar hasta que el administrador apruebe tu empresa.</span>
+              </div>
+            )}
             <div className="border border-[hsl(var(--border))] bg-[#F8FAFC] p-6">
               <div className="font-mono-data text-xs text-slate-500">PREVIEW · ANÓNIMO</div>
               <h3 className="font-display text-2xl font-semibold mt-2">{f.title}</h3>
@@ -119,19 +235,55 @@ export default function NewPack() {
               </div>
               <p className="mt-4 text-sm text-slate-600">{f.description || "—"}</p>
             </div>
+            {useBroker === false && (
+              <div className="border border-[hsl(var(--border))] bg-[#F8FAFC] px-4 py-3 text-sm text-slate-600">
+                <span className="overline block mb-1">Sin broker</span>
+                El pack será visible para todos los brokers del marketplace, quienes podrán contactarte directamente para ofrecerte sus servicios.
+              </div>
+            )}
+            {useBroker === true && f.broker_id && (
+              <div className="border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <span className="overline block mb-1">Con broker seleccionado</span>
+                Al publicar, se enviará automáticamente una solicitud de colaboración al broker seleccionado.
+              </div>
+            )}
             <label className="flex items-start gap-3 text-sm">
               <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} data-testid="confirm-anon" />
               <span>{t("pack.confirm_anon")}</span>
             </label>
           </div>
         )}
-        {err && <div className="mt-4 text-xs text-[#D32F2F] border border-[#D32F2F] bg-red-50 p-3">{err}</div>}
+
+        {err === "PACK_LIMIT" ? (
+          <div className="mt-4 text-xs text-[#D32F2F] border border-[#D32F2F] bg-red-50 p-4 flex gap-3">
+            <AlertTriangle size={16} className="shrink-0 text-[#D32F2F] mt-0.5" strokeWidth={1.5} />
+            <span>
+              Has alcanzado el límite de 5 packs publicados.{" "}
+              <Link to="/app" className="underline font-semibold">Ve al dashboard</Link>{" "}
+              y retira un pack existente para poder publicar uno nuevo.
+            </span>
+          </div>
+        ) : err ? (
+          <div className="mt-4 text-xs text-[#D32F2F] border border-[#D32F2F] bg-red-50 p-3">{err}</div>
+        ) : null}
       </div>
 
       <div className="flex justify-between mt-6">
-        <button className="rsm-btn-outline" onClick={() => step > 1 ? setStep(step - 1) : nav("/app")} data-testid="pack-back">{step > 1 ? t("common.back") : t("common.cancel")}</button>
+        <button
+          className="rsm-btn-outline"
+          onClick={() => { setErr(""); step > 1 ? setStep(step - 1) : nav("/app"); }}
+          data-testid="pack-back"
+        >
+          {step > 1 ? t("common.back") : t("common.cancel")}
+        </button>
         {step < 4 ? (
-          <button className="rsm-btn-primary" onClick={() => setStep(step + 1)} data-testid="pack-next">{t("common.next")}</button>
+          <button
+            className="rsm-btn-primary"
+            onClick={() => { if (!canNext()) { setErr(step === 1 && useBroker === null ? "Selecciona si quieres trabajar con broker o no." : step === 1 && useBroker === true && !f.broker_id ? "Selecciona un broker para continuar." : ""); return; } setErr(""); setStep(step + 1); }}
+            data-testid="pack-next"
+          >
+            {t("common.next")}
+          </button>
         ) : (
           <div className="flex gap-3">
             <button className="rsm-btn-outline" onClick={() => save("draft")} data-testid="pack-save-draft">{t("pack.save_draft")}</button>
@@ -139,6 +291,21 @@ export default function NewPack() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function AvailabilityDot({ value }) {
+  const map = {
+    available: { c: "#10B981", l: "Disponible" },
+    busy: { c: "#F59E0B", l: "Ocupado" },
+    unavailable: { c: "#EF4444", l: "No disponible" },
+  };
+  const s = map[value] || map.unavailable;
+  return (
+    <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold" style={{ color: s.c }}>
+      <CircleDot size={9} strokeWidth={2} style={{ color: s.c, fill: s.c }} />
+      {s.l}
     </div>
   );
 }
@@ -151,6 +318,7 @@ function F({ label, value, onChange, type = "text", placeholder }) {
     </div>
   );
 }
+
 function Sel({ label, value, onChange, options }) {
   return (
     <div>

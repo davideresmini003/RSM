@@ -4,6 +4,7 @@ import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { VerifiedBadge, AnonBadge, LossRatioPill } from "../components/ui-bits";
+import { useToast } from "../components/Toast";
 import { Lock, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, FileText } from "lucide-react";
 
 export default function SubmissionPackDetail() {
@@ -13,6 +14,7 @@ export default function SubmissionPackDetail() {
   const nav = useNavigate();
   const [pack, setPack] = useState(null);
   const [loading, setLoading] = useState(true);
+  const toast = useToast();
   const [err, setErr] = useState("");
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
@@ -39,7 +41,7 @@ export default function SubmissionPackDetail() {
       setMessage("");
       await load();
     } catch (e) {
-      alert(formatApiError(e.response?.data?.detail) || e.message);
+      toast.error(formatApiError(e.response?.data?.detail) || e.message);
     } finally {
       setSending(false);
     }
@@ -98,9 +100,11 @@ export default function SubmissionPackDetail() {
             {!isReasegurador && user?.role !== "admin" && (
               <div className="overline text-slate-400 text-center p-4 border border-[hsl(var(--border))]">Solo reaseguradores pueden expresar interés</div>
             )}
-            <div className="mt-3 text-xs text-slate-500 text-center">
-              {pack.interests_count} {pack.interests_count === 1 ? "reasegurador interesado" : "reaseguradores interesados"}
-            </div>
+            {pack.interests_count != null && (
+              <div className="mt-3 text-xs text-slate-500 text-center">
+                {pack.interests_count} {pack.interests_count === 1 ? "reasegurador interesado" : "reaseguradores interesados"}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -38,13 +38,14 @@ export function LossRatioPill({ value }) {
   );
 }
 
-export function KPICard({ label, value, accent = false, testid }) {
+export function KPICard({ label, value, sub, accent = false, testid }) {
   return (
     <div className="rsm-card rsm-card-hover" data-testid={testid}>
       <div className="overline">{label}</div>
       <div className={`mt-3 font-mono-data font-semibold text-3xl ${accent ? "text-[#D32F2F]" : "text-[#0B132B]"}`}>
         {value ?? "—"}
       </div>
+      {sub != null && <div className="mt-1 text-xs text-slate-400">{sub}</div>}
     </div>
   );
 }
@@ -60,8 +61,50 @@ export function SectionTitle({ children, actions }) {
 
 export function EmptyState({ children }) {
   return (
-    <div className="text-center py-12 text-slate-400 text-sm">
+    <div className="text-center py-12 text-slate-400 text-sm flex flex-col items-center gap-1">
       {children}
     </div>
+  );
+}
+
+export function SkeletonCard() {
+  return (
+    <div className="rsm-card animate-pulse">
+      <div className="flex justify-between">
+        <div className="h-3 bg-slate-200 rounded w-20" />
+        <div className="h-3 bg-slate-200 rounded w-16" />
+      </div>
+      <div className="h-5 bg-slate-200 rounded w-3/4 mt-4" />
+      <div className="mt-4 pt-4 border-t border-[hsl(var(--border))] space-y-2">
+        <div className="flex justify-between"><div className="h-2.5 bg-slate-100 rounded w-16" /><div className="h-2.5 bg-slate-200 rounded w-20" /></div>
+        <div className="flex justify-between"><div className="h-2.5 bg-slate-100 rounded w-16" /><div className="h-2.5 bg-slate-200 rounded w-24" /></div>
+        <div className="flex justify-between"><div className="h-2.5 bg-slate-100 rounded w-16" /><div className="h-2.5 bg-slate-200 rounded w-16" /></div>
+        <div className="flex justify-between"><div className="h-2.5 bg-slate-100 rounded w-16" /><div className="h-2.5 bg-slate-200 rounded w-12" /></div>
+      </div>
+    </div>
+  );
+}
+
+export function SkeletonRow() {
+  return (
+    <div className="rsm-card animate-pulse flex items-center justify-between">
+      <div className="space-y-2">
+        <div className="h-3 bg-slate-200 rounded w-24" />
+        <div className="h-2.5 bg-slate-100 rounded w-36" />
+      </div>
+      <div className="h-3 bg-slate-200 rounded w-20" />
+    </div>
+  );
+}
+
+export function Tooltip({ children, content }) {
+  return (
+    <span className="relative group inline-flex items-center">
+      {children}
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-[#0B132B] text-white text-xs px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 text-center leading-snug">
+        {content}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0B132B]" />
+      </span>
+    </span>
   );
 }

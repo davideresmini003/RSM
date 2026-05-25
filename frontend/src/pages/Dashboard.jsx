@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, formatApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
-import { KPICard, SectionTitle, EmptyState, VerifiedBadge, AnonBadge, LossRatioPill } from "../components/ui-bits";
+import { KPICard, SectionTitle, EmptyState, VerifiedBadge, AnonBadge, LossRatioPill, Tooltip } from "../components/ui-bits";
+import { useToast } from "../components/Toast";
+import { useConfirm } from "../lib/confirm";
 import { Lock, ArrowRight, CircleDot } from "lucide-react";
 
 export default function Dashboard() {
@@ -45,25 +47,49 @@ export default function Dashboard() {
 
 function CedenteDashboard({ stats, userId }) {
   const { t } = useI18n();
+  const toast = useToast();
+  const { confirm, ConfirmPortal } = useConfirm();
   const [packs, setPacks] = useState([]);
   const [interests, setInterests] = useState([]);
   const [ops, setOps] = useState([]);
+  const [pendingMandates, setPendingMandates] = useState([]);
+  const [activeBrokers, setActiveBrokers] = useState([]);
 
   const load = useCallback(() => {
     api.get("/submission-packs/mine").then(({ data }) => setPacks(data.packs || []));
     api.get("/interests/received?status=pending").then(({ data }) => setInterests(data.items || []));
     api.get("/operations").then(({ data }) => setOps((data.operations || []).slice(0, 3)));
+    api.get("/mandates").then(({ data }) => {
+      const all = data.mandates || [];
+      const pending = all.filter((m) => m.nca_signed_broker && !m.nca_signed_cedente);
+      const active = all.filter((m) => m.nca_signed_broker && m.nca_signed_cedente);
+      setPendingMandates(pending);
+      setActiveBrokers(active);
+    }).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load, userId]);
 
   const publish = async (id) => {
-    try { await api.put(`/submission-packs/${id}/status`, { status: "published" }); load(); } catch (e) { alert(e.response?.data?.detail || e.message); }
+    try { await api.put(`/submission-packs/${id}/status`, { status: "published" }); load(); }
+    catch (e) { toast.error(formatApiError(e.response?.data?.detail) || e.message); }
   };
   const withdraw = async (id) => {
-    await api.put(`/submission-packs/${id}/status`, { status: "withdrawn" }); load();
+    const ok = await confirm({ title: "¿Retirar este pack?", message: "Dejará de ser visible en el marketplace. Podrás volver a publicarlo después.", confirmLabel: "Retirar" });
+    if (!ok) return;
+    try { await api.put(`/submission-packs/${id}/status`, { status: "withdrawn" }); load(); toast.success("Pack retirado del marketplace."); }
+    catch (e) { toast.error(formatApiError(e.response?.data?.detail) || e.message); }
+  };
+  const assignBroker = async (packId, brokerId) => {
+    try { await api.put(`/submission-packs/${packId}/broker`, { broker_id: brokerId || null }); load(); }
+    catch (e) { toast.error(formatApiError(e.response?.data?.detail) || e.message); }
   };
   const respond = async (id, action) => {
-    await api.post(`/interests/${id}/respond`, { action }); load();
+    if (action === "reject") {
+      const ok = await confirm({ title: "¿Rechazar este interés?", message: "El reasegurador no podrá acceder a este programa.", confirmLabel: "Rechazar" });
+      if (!ok) return;
+    }
+    try { await api.post(`/interests/${id}/respond`, { action }); load(); }
+    catch (e) { toast.error(formatApiError(e.response?.data?.detail) || e.message); }
   };
 
   return (
@@ -72,7 +98,7 @@ function CedenteDashboard({ stats, userId }) {
         <div className="border-r border-b border-[hsl(var(--border))]"><KPICard testid="kpi-published" label={t("dashboard.kpi.published")} value={stats?.published ?? 0} /></div>
         <div className="border-r border-b border-[hsl(var(--border))]"><KPICard testid="kpi-interests" label={t("dashboard.kpi.interests_recv")} value={stats?.interests_pending ?? 0} /></div>
         <div className="border-r border-b border-[hsl(var(--border))]"><KPICard testid="kpi-active-ops" label={t("dashboard.kpi.active_ops")} value={stats?.active_ops ?? 0} /></div>
-        <div className="border-r border-b border-[hsl(var(--border))]"><KPICard testid="kpi-nca-pending" accent label={t("dashboard.kpi.nca_pending")} value={stats?.nca_pending ?? 0} /></div>
+        <div className="border-r border-b border-[hsl(var(--border))]"><KPICard testid="kpi-nca-pending" accent label={t("dashboard.kpi.nca_pending")} value={stats?.nca_pending ?? 0} sub={stats?.mandate_nca_pending ? `${stats.mandate_nca_pending} con broker` : null} /></div>
       </div>
 
       <section className="mb-10">
@@ -80,7 +106,12 @@ function CedenteDashboard({ stats, userId }) {
           <Link to="/app/new-pack" className="rsm-btn-primary text-xs" data-testid="btn-new-pack">{t("dashboard.new_pack")}</Link>
         }>{t("dashboard.my_programs")}</SectionTitle>
 
-        {packs.length === 0 ? <EmptyState>{t("dashboard.no_data")}</EmptyState> : (
+        {packs.length === 0 ? (
+          <EmptyState>
+            <p>Publica tu primer Submission Pack y accede al mercado reasegurador europeo.</p>
+            <Link to="/app/new-pack" className="rsm-btn-primary text-xs mt-4 inline-block" data-testid="cta-new-pack">+ Crear Submission Pack</Link>
+          </EmptyState>
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {packs.map((p) => (
               <div key={p.id} className="rsm-card rsm-card-hover" data-testid={`pack-${p.id}`}>
@@ -89,18 +120,34 @@ function CedenteDashboard({ stats, userId }) {
                     <div className="font-mono-data text-sm font-semibold">{p.code}</div>
                     <h3 className="font-display text-lg font-semibold mt-1">{p.title}</h3>
                   </div>
-                  {p.status === "draft" && <span className="badge-anon">DRAFT</span>}
-                  {p.status === "published" && <VerifiedBadge>PUBLICADO</VerifiedBadge>}
-                  {p.status === "withdrawn" && <span className="badge-pending">RETIRADO</span>}
+                  {p.status === "draft" && <span className="badge-anon">{t("pack.status.draft")}</span>}
+                  {p.status === "published" && <VerifiedBadge>{t("pack.status.published")}</VerifiedBadge>}
+                  {p.status === "withdrawn" && <span className="badge-pending">{t("pack.status.withdrawn")}</span>}
                 </div>
                 <div className="mt-3 text-xs text-slate-500 space-y-1">
                   <div>{p.branch} · {p.reinsurance_type}</div>
                   <div>{p.country_region || "—"} · Cesión {p.cession_pct}%</div>
-                  <div>{p.interests_count} interesados · {p.interests_pending} pendientes</div>
+                  <div>{p.interests_count ?? 0} {t("marketplace.interests")} · {p.interests_pending ?? 0} {t("pack.pending_review")}</div>
                 </div>
+                {activeBrokers.length > 0 && p.status !== "withdrawn" && (
+                  <div className="mt-3 pt-3 border-t border-[hsl(var(--border))]">
+                    <label className="rsm-label text-[10px]">Broker asignado</label>
+                    <select
+                      className="rsm-input mt-1 text-xs py-1"
+                      value={p.broker_id || ""}
+                      onChange={(e) => assignBroker(p.id, e.target.value || null)}
+                      data-testid={`broker-select-${p.id}`}
+                    >
+                      <option value="">Sin broker</option>
+                      {activeBrokers.map((m) => (
+                        <option key={m.broker_id} value={m.broker_id}>{m.broker_name || m.broker_id}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="mt-4 flex gap-2">
-                  {p.status === "draft" && <button className="rsm-btn-primary text-xs" onClick={() => publish(p.id)} data-testid={`publish-${p.id}`}>Publicar</button>}
-                  {p.status === "published" && <button className="rsm-btn-outline text-xs" onClick={() => withdraw(p.id)}>Retirar</button>}
+                  {p.status === "draft" && <button className="rsm-btn-primary text-xs" onClick={() => publish(p.id)} data-testid={`publish-${p.id}`}>{t("pack.action_publish")}</button>}
+                  {p.status === "published" && <button className="rsm-btn-outline text-xs" onClick={() => withdraw(p.id)} data-testid={`withdraw-${p.id}`}>{t("pack.action_withdraw")}</button>}
                 </div>
               </div>
             ))}
@@ -131,9 +178,33 @@ function CedenteDashboard({ stats, userId }) {
         )}
       </section>
 
+      {ConfirmPortal}
+      {pendingMandates.length > 0 && (
+        <section className="mb-10">
+          <SectionTitle actions={<Link to="/app/mandates" className="overline text-[#D32F2F]">Ver todos →</Link>}>
+            🔔 NCA Pendiente con Broker
+          </SectionTitle>
+          <div className="space-y-3">
+            {pendingMandates.map((m) => (
+              <div key={m.id} className="rsm-card border-l-4 border-[#D32F2F] flex items-center justify-between" data-testid={`pending-mandate-${m.id}`}>
+                <div>
+                  <div className="text-sm font-semibold">El broker ha firmado el NCA — tu firma está pendiente</div>
+                  <div className="text-xs text-slate-500 mt-1">Mandato creado el {new Date(m.created_at).toLocaleDateString()}</div>
+                </div>
+                <Link to="/app/mandates" className="rsm-btn-primary text-xs">Firmar NCA</Link>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section>
-        <SectionTitle>{t("dashboard.recent_ops")}</SectionTitle>
-        {ops.length === 0 ? <EmptyState>{t("dashboard.no_data")}</EmptyState> : (
+        <SectionTitle actions={<Link to="/app/operations" className="overline text-[#0B132B] hover:text-[#D32F2F]">Ver todas →</Link>}>{t("dashboard.recent_ops")}</SectionTitle>
+        {ops.length === 0 ? (
+          <EmptyState>
+            <p>Las operaciones aparecerán aquí cuando aceptes intereses de reaseguradores.</p>
+          </EmptyState>
+        ) : (
           <div className="space-y-2">
             {ops.map((op) => <OpRow key={op.id} op={op} role="cedente" />)}
           </div>
@@ -160,7 +231,12 @@ function ReaseguradorDashboard({ stats, nav, userId }) {
 
       <section>
         <SectionTitle actions={<Link to="/app/marketplace" className="overline text-[#0B132B] hover:text-[#D32F2F] flex items-center gap-1" data-testid="link-marketplace">{t("dashboard.ver_oportunidades")} <ArrowRight size={14} /></Link>}>{t("dashboard.nuevas_oportunidades")}</SectionTitle>
-        {packs.length === 0 ? <EmptyState>Sin oportunidades todavía.</EmptyState> : (
+        {packs.length === 0 ? (
+          <EmptyState>
+            <p>Explora los programas de reaseguro publicados en el marketplace.</p>
+            <Link to="/app/marketplace" className="rsm-btn-primary text-xs mt-4 inline-block" data-testid="cta-marketplace">Ver oportunidades →</Link>
+          </EmptyState>
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{packs.map((p) => <PackCard key={p.id} p={p} />)}</div>
         )}
       </section>
@@ -171,8 +247,10 @@ function ReaseguradorDashboard({ stats, nav, userId }) {
 function BrokerDashboard({ stats, userId }) {
   const { t } = useI18n();
   const [sols, setSols] = useState([]);
+  const [assignedPacks, setAssignedPacks] = useState([]);
   useEffect(() => {
     api.get("/solicitudes/broker").then(({ data }) => setSols((data.items || []).filter((s) => s.status === "pending").slice(0, 3)));
+    api.get("/broker/assigned-packs").then(({ data }) => setAssignedPacks(data.packs || [])).catch(() => {});
   }, [userId]);
   return (
     <>
@@ -182,8 +260,37 @@ function BrokerDashboard({ stats, userId }) {
         <div className="border-r border-b border-[hsl(var(--border))]"><KPICard label={t("dashboard.kpi.ops_active")} value={stats?.ops_active ?? 0} /></div>
         <div className="border-r border-b border-[hsl(var(--border))]"><KPICard label={t("dashboard.kpi.rating_avg")} value={`${stats?.rating_avg ?? 0}/5`} /></div>
       </div>
+
+      {assignedPacks.length > 0 && (
+        <section className="mb-10">
+          <SectionTitle actions={<Link to="/app/marketplace" className="overline text-[#0B132B]">Ver marketplace</Link>}>Mis programas gestionados</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {assignedPacks.map((p) => (
+              <Link key={p.id} to={`/app/marketplace/${p.id}`} className="rsm-card rsm-card-hover block" data-testid={`broker-pack-${p.id}`}>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-mono-data text-xs text-slate-500">{p.code}</div>
+                    <h3 className="font-display text-base font-semibold mt-1">{p.title}</h3>
+                    <div className="text-xs text-slate-500 mt-1">{p.cedente_name || "Cedente"} · {p.branch}</div>
+                  </div>
+                  <span className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 border ${p.status === "published" ? "bg-emerald-50 text-emerald-800 border-emerald-300" : "bg-slate-50 text-slate-500 border-slate-200"}`}>
+                    {p.status}
+                  </span>
+                </div>
+                <div className="mt-2 text-xs text-slate-400">{p.interests_count} interesados</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       <SectionTitle actions={<Link to="/app/solicitudes" className="overline text-[#0B132B]">Ver todas</Link>}>Solicitudes pendientes</SectionTitle>
-      {sols.length === 0 ? <EmptyState>{t("broker.no_sol")}</EmptyState> : (
+      {sols.length === 0 ? (
+        <EmptyState>
+          <p>Completa tu perfil público para aparecer en el marketplace de brokers y recibir solicitudes.</p>
+          <Link to="/app/broker-profile" className="rsm-btn-primary text-xs mt-4 inline-block" data-testid="cta-broker-profile">Editar mi perfil →</Link>
+        </EmptyState>
+      ) : (
         <div className="space-y-3">{sols.map((s) => (
           <div key={s.id} className="rsm-card flex justify-between items-start border-l-4 border-[#FCD34D]">
             <div>
@@ -213,16 +320,17 @@ function AdminDashboard({ stats }) {
 }
 
 function OpRow({ op, role }) {
+  const { t } = useI18n();
   const counterName = role === "cedente"
-    ? (op.revealed ? op.reasegurador_name : "🔒 Reasegurador anónimo")
-    : (op.revealed ? op.cedente_name : "🔒 Cedente anónimo");
+    ? (op.revealed ? op.reasegurador_name : t("pack.anon_reas"))
+    : (op.revealed ? op.cedente_name : t("pack.anon_ced"));
   return (
     <Link to={`/app/operations/${op.id}`} className="rsm-card rsm-card-hover flex items-center justify-between" data-testid={`op-row-${op.id}`}>
       <div>
         <div className="font-mono-data text-sm font-semibold">{op.code}</div>
         <div className="text-xs text-slate-500 mt-1">{counterName}</div>
       </div>
-      <div className="overline">{op.state.replace("_", " ")}</div>
+      <div className="overline">{t(`operation.states.${op.state}`) || op.state.replace("_", " ")}</div>
     </Link>
   );
 }
@@ -243,9 +351,19 @@ export function PackCard({ p }) {
         <div className="flex justify-between"><span className="text-slate-500">{t("pack.f_branch")}</span><span className="font-semibold">{p.branch}</span></div>
         <div className="flex justify-between"><span className="text-slate-500">{t("pack.f_type")}</span><span className="font-semibold">{p.reinsurance_type}</span></div>
         <div className="flex justify-between"><span className="text-slate-500">{t("pack.f_country")}</span><span className="font-semibold">{p.country_region || "—"}</span></div>
-        <div className="flex justify-between items-center"><span className="text-slate-500">LR avg</span><LossRatioPill value={p.avg_loss_ratio} /></div>
+        <div className="flex justify-between items-center">
+          <Tooltip content="Loss Ratio: siniestros pagados / primas devengadas × 100. &lt;65% bueno, 65-80% moderado, &gt;80% elevado.">
+            <span className="text-slate-500 cursor-default">LR avg ⓘ</span>
+          </Tooltip>
+          <LossRatioPill value={p.avg_loss_ratio} />
+        </div>
         <div className="flex justify-between"><span className="text-slate-500">Primas Y-1</span><span className="font-mono-data">€{Number(p.premiums_y1 || 0).toLocaleString("es-ES")}</span></div>
-        <div className="flex justify-between"><span className="text-slate-500">Cesión</span><span className="font-mono-data">{p.cession_pct}%</span></div>
+        <div className="flex justify-between">
+          <Tooltip content="Porcentaje del riesgo original cedido al reasegurador.">
+            <span className="text-slate-500 cursor-default">Cesión ⓘ</span>
+          </Tooltip>
+          <span className="font-mono-data">{p.cession_pct}%</span>
+        </div>
       </div>
       <div className="mt-3 flex justify-between items-center text-[10px] uppercase tracking-wider text-slate-400">
         <span>{p.interests_count} {t("marketplace.interests")}</span>

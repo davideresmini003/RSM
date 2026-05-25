@@ -3,7 +3,7 @@ import { useI18n } from "../lib/i18n";
 
 const STEPS = [
   { key: "interes", label: "state_interes" },
-  { key: "nca_pending", label: "state_nca_pending" },
+  { key: "nca_pending", label: "state_chat_open" },
   { key: "nca_signed", label: "state_nca_signed" },
   { key: "quote_pending", label: "state_quote_pending" },
   { key: "quote_received", label: "state_quote_received" },
@@ -21,7 +21,7 @@ const STATE_INDEX = {
 
 export function Timeline({ state }) {
   const { t } = useI18n();
-  const activeIdx = STATE_INDEX[state] ?? 0;
+  const activeIdx = state === "closed" ? STEPS.length : (STATE_INDEX[state] ?? 0);
   return (
     <div className="w-full py-4" data-testid="operation-timeline">
       <div className="flex items-start relative">
