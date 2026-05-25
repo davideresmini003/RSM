@@ -60,7 +60,7 @@ def _is_pack_owner(pack: dict, user: dict) -> bool:
 
 
 @router.post("/submission-packs/{pack_id}/files")
-async def upload_pack_file(pack_id: str, request: Request, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+async def upload_pack_file(pack_id: str, request: Request, file: UploadFile = File(...), is_preview: bool = False, user: dict = Depends(get_current_user)):
     pack = await db.submission_packs.find_one({"id": pack_id})
     if not pack:
         raise HTTPException(status_code=404, detail="Pack no encontrado")
@@ -77,12 +77,13 @@ async def upload_pack_file(pack_id: str, request: Request, file: UploadFile = Fi
         "filename": file.filename,
         "content_type": file.content_type or "application/octet-stream",
         "size": len(content),
+        "is_preview": bool(is_preview),
         "uploaded_by": user["id"],
         "uploaded_at": now_iso(),
         "data": base64.b64encode(content).decode(),
     }
     await db.pack_files.insert_one(doc)
-    await audit("pack_file.upload", user, "pack", pack_id, meta={"filename": file.filename, "size": len(content)}, request=request)
+    await audit("pack_file.upload", user, "pack", pack_id, meta={"filename": file.filename, "size": len(content), "preview": bool(is_preview)}, request=request)
     return {"file": {k: v for k, v in doc.items() if k not in ("data", "_id")}}
 
 
@@ -91,10 +92,13 @@ async def list_pack_files(pack_id: str, user: dict = Depends(get_current_user)):
     pack = await db.submission_packs.find_one({"id": pack_id})
     if not pack:
         raise HTTPException(status_code=404)
-    if not await _can_see_pack_files(pack, user):
-        return {"files": [], "locked": True}
-    files = await db.pack_files.find({"pack_id": pack_id}, {"_id": 0, "data": 0}).sort("uploaded_at", 1).to_list(100)
-    return {"files": files, "locked": False, "is_owner": _is_pack_owner(pack, user)}
+    can_see_all = await _can_see_pack_files(pack, user)
+    if can_see_all:
+        files = await db.pack_files.find({"pack_id": pack_id}, {"_id": 0, "data": 0}).sort("uploaded_at", 1).to_list(100)
+        return {"files": files, "locked": False, "is_owner": _is_pack_owner(pack, user)}
+    # Anyone authenticated can see ONLY preview files (no NCA needed)
+    preview = await db.pack_files.find({"pack_id": pack_id, "is_preview": True}, {"_id": 0, "data": 0}).sort("uploaded_at", 1).to_list(50)
+    return {"files": preview, "locked": True, "is_owner": False}
 
 
 @router.delete("/submission-packs/{pack_id}/files/{file_id}")
@@ -119,8 +123,10 @@ async def download_pack_file(file_id: str, user: dict = Depends(get_current_user
     pack = await db.submission_packs.find_one({"id": f["pack_id"]})
     if not pack:
         raise HTTPException(status_code=404)
-    if not await _can_see_pack_files(pack, user):
-        raise HTTPException(status_code=403, detail="Sin acceso al archivo (requiere NCA firmado)")
+    # Preview files are accessible to anyone authenticated
+    if not f.get("is_preview"):
+        if not await _can_see_pack_files(pack, user):
+            raise HTTPException(status_code=403, detail="Sin acceso al archivo (requiere NCA firmado)")
     data = base64.b64decode(f["data"])
     return Response(
         content=data,

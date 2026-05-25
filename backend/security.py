@@ -66,7 +66,10 @@ async def get_current_user(request: Request) -> dict:
 
 def require_role(*roles: str):
     async def _dep(user: dict = Depends(get_current_user)):
+        # admin bypasses all role restrictions
+        if user.get("role") == "admin":
+            return user
         if user.get("role") not in roles:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
+            raise HTTPException(status_code=403, detail=f"Esta acción requiere rol: {' o '.join(roles)}")
         return user
     return _dep

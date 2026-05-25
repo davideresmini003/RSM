@@ -213,41 +213,73 @@ export default function NewPack() {
         {step === 3 && (
           <div className="space-y-5">
             <div className="overline">{t("pack.step3")}</div>
-            <p className="text-sm text-slate-600">Sube los documentos del programa. Quedan clasificados como <b>post-NCA</b>: solo serán visibles al reasegurador después de la firma digital del NCA por ambas partes. Máx. 10 MB por archivo.</p>
-            <label className="block border-2 border-dashed border-[hsl(var(--border))] hover:border-[#0B132B] p-8 text-center cursor-pointer transition-colors" data-testid="pack-file-dropzone">
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  const picked = Array.from(e.target.files || []);
-                  const allowed = picked.filter((fl) => fl.size <= 10 * 1024 * 1024);
-                  setFiles((prev) => [...prev, ...allowed]);
-                  e.target.value = "";
-                }}
-                data-testid="pack-file-input"
-              />
-              <div className="overline text-[#0B132B]">+ Añadir archivos</div>
-              <div className="text-xs text-slate-500 mt-2">SFCR · Histórico de primas · Siniestros · Cualquier PDF/Excel/Word</div>
-            </label>
-            {files.length > 0 && (
-              <div className="space-y-2" data-testid="pack-file-list">
-                {files.map((fl, idx) => (
-                  <div key={`${fl.name}-${idx}`} className="border border-[hsl(var(--border))] p-3 text-sm flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">{fl.name}</div>
-                      <div className="text-xs text-slate-500 font-mono-data">{(fl.size / 1024).toFixed(1)} KB · {fl.type || "—"}</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setFiles((prev) => prev.filter((_, i) => i !== idx))}
-                      className="rsm-btn-danger"
-                      data-testid={`pack-file-remove-${idx}`}
-                    >Eliminar</button>
+
+            {/* PUBLIC PREVIEW — visible to all reaseguradores BEFORE NCA */}
+            <div className="border-l-4 border-[#0B132B] bg-[#F8FAFC] p-4">
+              <div className="overline text-[#0B132B] mb-1">📄 Documento de presentación (pre-NCA)</div>
+              <p className="text-xs text-slate-600 mb-3">
+                Documento <b>visible para cualquier reasegurador</b> antes de firmar el NCA, sin datos identificativos. Sirve como ficha del riesgo para que decida si expresar interés. <b>No incluyas datos confidenciales aquí.</b>
+              </p>
+              {!previewFile ? (
+                <label className="block border-2 border-dashed border-[#0B132B] hover:bg-white p-4 text-center cursor-pointer">
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    className="hidden"
+                    onChange={(e) => {
+                      const fl = e.target.files?.[0];
+                      if (fl && fl.size <= 10 * 1024 * 1024) setPreviewFile(fl);
+                      e.target.value = "";
+                    }}
+                    data-testid="pack-preview-input"
+                  />
+                  <div className="overline text-[#0B132B]">+ Subir presentación del programa</div>
+                </label>
+              ) : (
+                <div className="border border-[#0B132B] bg-white p-3 text-sm flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">{previewFile.name}</div>
+                    <div className="text-xs text-slate-500 font-mono-data">{(previewFile.size / 1024).toFixed(1)} KB</div>
                   </div>
-                ))}
-              </div>
-            )}
+                  <button type="button" onClick={() => setPreviewFile(null)} className="rsm-btn-danger">Eliminar</button>
+                </div>
+              )}
+            </div>
+
+            {/* POST-NCA — confidential docs */}
+            <div className="pt-2">
+              <div className="overline mb-1">🔒 Documentos confidenciales (post-NCA)</div>
+              <p className="text-xs text-slate-600 mb-3">Visibles solo para el reasegurador tras firmar el NCA. Máx. 10 MB por archivo.</p>
+              <label className="block border-2 border-dashed border-[hsl(var(--border))] hover:border-[#0B132B] p-6 text-center cursor-pointer transition-colors" data-testid="pack-file-dropzone">
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const picked = Array.from(e.target.files || []);
+                    const allowed = picked.filter((fl) => fl.size <= 10 * 1024 * 1024);
+                    setFiles((prev) => [...prev, ...allowed]);
+                    e.target.value = "";
+                  }}
+                  data-testid="pack-file-input"
+                />
+                <div className="overline text-[#0B132B]">+ Añadir archivos confidenciales</div>
+                <div className="text-xs text-slate-500 mt-2">SFCR · Histórico siniestros · Exposición · Cualquier PDF/Excel/Word</div>
+              </label>
+              {files.length > 0 && (
+                <div className="space-y-2 mt-3" data-testid="pack-file-list">
+                  {files.map((fl, idx) => (
+                    <div key={`${fl.name}-${idx}`} className="border border-[hsl(var(--border))] p-3 text-sm flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{fl.name}</div>
+                        <div className="text-xs text-slate-500 font-mono-data">{(fl.size / 1024).toFixed(1)} KB</div>
+                      </div>
+                      <button type="button" onClick={() => setFiles((prev) => prev.filter((_, i) => i !== idx))} className="rsm-btn-danger" data-testid={`pack-file-remove-${idx}`}>Eliminar</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

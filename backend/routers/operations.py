@@ -11,10 +11,19 @@ from utils import now_iso, clean_doc, audit
 router = APIRouter()
 
 
+def _all_ncas_signed(op: dict) -> bool:
+    """All required parties (cedente, reasegurador, broker if present) have signed the NCA."""
+    if not (op.get("nca_signed_cedente") and op.get("nca_signed_reasegurador")):
+        return False
+    if op.get("broker_user_id") and not op.get("nca_signed_broker"):
+        return False
+    return True
+
+
 def _operation_visibility(op: dict, user: dict) -> dict:
-    both_signed = op.get("nca_signed_cedente") and op.get("nca_signed_reasegurador")
+    all_signed = _all_ncas_signed(op)
     op = dict(op)
-    op["revealed"] = bool(both_signed)
+    op["revealed"] = bool(all_signed)
     if user["role"] == "admin":
         op["revealed"] = True
     return op
@@ -108,8 +117,10 @@ async def respond_interest(interest_id: str, body: dict, request: Request, user:
         "state": "nca_pending",
         "nca_signed_cedente": False,
         "nca_signed_reasegurador": False,
+        "nca_signed_broker": False,
         "nca_signed_at_cedente": None,
         "nca_signed_at_reasegurador": None,
+        "nca_signed_at_broker": None,
         "quote_id": None,
         "contract_id": None,
         "suspended": False,
@@ -216,6 +227,10 @@ async def sign_nca(op_id: str, payload: NcaSignIn, request: Request, user: dict 
     is_rea = (op["reasegurador_user_id"] == user["id"]) or (
         user_role == "reasegurador" and user_company and user_company == op.get("reasegurador_company_id")
     )
+    is_broker_signer = bool(op.get("broker_user_id")) and (
+        op.get("broker_user_id") == user["id"]
+        or (user_role == "broker" and user_company and user_company == op.get("broker_company_id"))
+    )
     if is_cedente:
         filter_cond = {"id": op_id, "nca_signed_cedente": False}
         update_fields = {
@@ -232,16 +247,23 @@ async def sign_nca(op_id: str, payload: NcaSignIn, request: Request, user: dict 
             "nca_signer_reasegurador": payload.signer_name,
         }
         already_msg = "El reasegurador ya firmó el NCA"
+    elif is_broker_signer:
+        filter_cond = {"id": op_id, "nca_signed_broker": False}
+        update_fields = {
+            "nca_signed_broker": True,
+            "nca_signed_at_broker": now_iso(),
+            "nca_signer_broker": payload.signer_name,
+        }
+        already_msg = "El broker ya firmó el NCA"
     else:
         raise HTTPException(status_code=403, detail="No está autorizado para firmar este NCA")
     # Atomic update: only succeeds if the field is still False (prevents double-sign race condition)
     before = await db.operations.find_one_and_update(filter_cond, {"$set": update_fields})
     if before is None:
         raise HTTPException(status_code=400, detail=already_msg)
-    # Determine state after update by merging before-doc with the fields we just set
-    new_cedente = update_fields.get("nca_signed_cedente", before.get("nca_signed_cedente"))
-    new_rea = update_fields.get("nca_signed_reasegurador", before.get("nca_signed_reasegurador"))
-    if new_cedente and new_rea:
+    # Re-fetch the up-to-date op and check whether ALL required parties have signed
+    updated = await db.operations.find_one({"id": op_id})
+    if _all_ncas_signed(updated) and updated.get("state") == "nca_pending":
         await db.operations.update_one({"id": op_id}, {"$set": {"state": "quote_pending"}})
     await audit("nca.sign", user, "operation", op_id, meta={"signer": payload.signer_name}, request=request)
     return {"ok": True}
@@ -262,7 +284,7 @@ async def submit_quote(op_id: str, payload: QuoteIn, request: Request, user: dic
     )
     if not op or not (is_rea or is_cedente):
         raise HTTPException(status_code=403)
-    if not (op.get("nca_signed_cedente") and op.get("nca_signed_reasegurador")):
+    if not _all_ncas_signed(op):
         raise HTTPException(status_code=400, detail="NCA not fully signed")
     # Bug 14: enforce minimum A- rating for reaseguradores sending quotes
     if is_rea and not is_cedente:
@@ -432,7 +454,7 @@ async def get_messages(op_id: str, channel: str, user: dict = Depends(get_curren
     if not allowed:
         raise HTTPException(status_code=403)
     role = user["role"]
-    both_nca_signed = op.get("nca_signed_cedente") and op.get("nca_signed_reasegurador")
+    both_nca_signed = _all_ncas_signed(op)
     allowed_channels = set()
     if op.get("broker_user_id"):
         if role == "cedente":
@@ -451,7 +473,7 @@ async def get_messages(op_id: str, channel: str, user: dict = Depends(get_curren
         allowed_channels.update({"documents", "cedente-reasegurador", "broker-cedente", "broker-reasegurador"})
     if channel not in allowed_channels:
         raise HTTPException(status_code=403, detail="Channel not available")
-    both_signed = op.get("nca_signed_cedente") and op.get("nca_signed_reasegurador")
+    both_signed = _all_ncas_signed(op)
     msgs = await db.messages.find({"operation_id": op_id, "channel": channel}, {"_id": 0}).sort("created_at", 1).to_list(500)
     # Anonymize sender names until both parties sign NCA
     if not both_signed:
@@ -478,7 +500,7 @@ async def send_message(payload: MessageIn, request: Request, user: dict = Depend
         user_role == "reasegurador" and user_company and user_company == op.get("reasegurador_company_id")
     )
     is_broker_user = op.get("broker_user_id") == user["id"]
-    both_nca_msg = op.get("nca_signed_cedente") and op.get("nca_signed_reasegurador")
+    both_nca_msg = _all_ncas_signed(op)
     if channel == "broker-cedente":
         if not (is_broker_user or is_cedente_user):
             raise HTTPException(status_code=403)
@@ -533,7 +555,7 @@ async def send_message_with_file(
         user_role == "reasegurador" and user_company and user_company == op.get("reasegurador_company_id")
     )
     is_broker_user = op.get("broker_user_id") == user["id"]
-    both_nca = op.get("nca_signed_cedente") and op.get("nca_signed_reasegurador")
+    both_nca = _all_ncas_signed(op)
     if channel == "broker-cedente":
         if not (is_broker_user or is_cedente_user):
             raise HTTPException(status_code=403)
