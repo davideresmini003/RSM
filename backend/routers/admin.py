@@ -61,13 +61,12 @@ async def unread_counts(user: dict = Depends(get_current_user)):
     company_id = user.get("company_id")
 
     if role == "cedente":
-        op_query = {"state": {"$nin": ["closed", "cancelled"]}}
+        op_query = {"state": {"$nin": ["closed", "cancelled"]}, "$or": [{"cedente_user_id": uid}]}
         if company_id:
-            op_query["cedente_company_id"] = company_id
-        else:
-            op_query["cedente_user_id"] = uid
-        ops = await db.operations.find(op_query, {"id": 1, "state": 1, "nca_signed_cedente": 1, "contract_id": 1}).to_list(200)
+            op_query["$or"].append({"cedente_company_id": company_id})
+        ops = await db.operations.find(op_query, {"id": 1, "code": 1, "state": 1, "nca_signed_cedente": 1, "contract_id": 1}).to_list(200)
         op_ids = [o["id"] for o in ops]
+        op_code_map = {o["id"]: o.get("code", o["id"][:8]) for o in ops}
         chat_ops = []
         if op_ids:
             visible_channels = ["cedente-reasegurador", "broker-cedente"]
@@ -77,7 +76,7 @@ async def unread_counts(user: dict = Depends(get_current_user)):
                 {"$group": {"_id": "$operation_id", "count": {"$sum": 1}, "last_at": {"$max": "$created_at"}}},
             ]
             async for doc in db.messages.aggregate(pipeline):
-                chat_ops.append({"op_id": doc["_id"], "count": doc["count"], "last_at": doc["last_at"]})
+                chat_ops.append({"op_id": doc["_id"], "op_code": op_code_map.get(doc["_id"], ""), "count": doc["count"], "last_at": doc["last_at"]})
         result["chat_ops"] = chat_ops
         result["chat"] = sum(o["count"] for o in chat_ops)
         nca_pending = sum(1 for o in ops if o.get("state") == "nca_pending" and not o.get("nca_signed_cedente"))
@@ -90,13 +89,12 @@ async def unread_counts(user: dict = Depends(get_current_user)):
         )
 
     elif role == "reasegurador":
-        op_query = {"state": {"$nin": ["closed", "cancelled"]}}
+        op_query = {"state": {"$nin": ["closed", "cancelled"]}, "$or": [{"reasegurador_user_id": uid}]}
         if company_id:
-            op_query["reasegurador_company_id"] = company_id
-        else:
-            op_query["reasegurador_user_id"] = uid
-        ops = await db.operations.find(op_query, {"id": 1, "state": 1, "nca_signed_reasegurador": 1, "contract": 1}).to_list(200)
+            op_query["$or"].append({"reasegurador_company_id": company_id})
+        ops = await db.operations.find(op_query, {"id": 1, "code": 1, "state": 1, "nca_signed_reasegurador": 1, "contract": 1}).to_list(200)
         op_ids = [o["id"] for o in ops]
+        op_code_map = {o["id"]: o.get("code", o["id"][:8]) for o in ops}
         chat_ops = []
         if op_ids:
             visible_channels = ["cedente-reasegurador", "broker-reasegurador"]
@@ -106,7 +104,7 @@ async def unread_counts(user: dict = Depends(get_current_user)):
                 {"$group": {"_id": "$operation_id", "count": {"$sum": 1}, "last_at": {"$max": "$created_at"}}},
             ]
             async for doc in db.messages.aggregate(pipeline):
-                chat_ops.append({"op_id": doc["_id"], "count": doc["count"], "last_at": doc["last_at"]})
+                chat_ops.append({"op_id": doc["_id"], "op_code": op_code_map.get(doc["_id"], ""), "count": doc["count"], "last_at": doc["last_at"]})
         result["chat_ops"] = chat_ops
         result["chat"] = sum(o["count"] for o in chat_ops)
         nca_pending = sum(1 for o in ops if o.get("state") == "nca_pending" and not o.get("nca_signed_reasegurador"))
@@ -127,7 +125,7 @@ async def unread_counts(user: dict = Depends(get_current_user)):
                 {"$group": {"_id": "$operation_id", "count": {"$sum": 1}, "last_at": {"$max": "$created_at"}}},
             ]
             async for doc in db.messages.aggregate(pipeline):
-                chat_ops.append({"op_id": doc["_id"], "count": doc["count"], "last_at": doc["last_at"]})
+                chat_ops.append({"op_id": doc["_id"], "op_code": "", "count": doc["count"], "last_at": doc["last_at"]})
         result["chat_ops"] = chat_ops
         result["chat"] = sum(o["count"] for o in chat_ops)
         result["solicitudes"] = await db.solicitudes.count_documents({"broker_id": uid, "status": "pending"})

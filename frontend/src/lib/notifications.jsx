@@ -16,11 +16,11 @@ export function markChatRead(opId) {
   try { window.dispatchEvent(new CustomEvent("rsm:chat-read", { detail: { opId } })); } catch (_) {}
 }
 
-const NotifCtx = createContext({ chat: 0, operations: 0, solicitudes: 0, interests: 0, refresh: () => {} });
+const NotifCtx = createContext({ chat: 0, operations: 0, solicitudes: 0, interests: 0, chat_ops: [], refresh: () => {} });
 
 export function NotificationsProvider({ children }) {
   const { user } = useAuth();
-  const [counts, setCounts] = useState({ chat: 0, operations: 0, solicitudes: 0, interests: 0 });
+  const [counts, setCounts] = useState({ chat: 0, operations: 0, solicitudes: 0, interests: 0, chat_ops: [] });
   const timerRef = useRef(null);
 
   const poll = useCallback(async () => {
@@ -34,7 +34,7 @@ export function NotificationsProvider({ children }) {
         return !readAt || o.last_at > readAt;
       });
       const chatCount = unreadOps.reduce((sum, o) => sum + o.count, 0);
-      setCounts({ ...data, chat: chatCount });
+      setCounts({ ...data, chat: chatCount, chat_ops: unreadOps });
     } catch (_) {}
   }, [user]);
 

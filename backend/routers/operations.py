@@ -146,15 +146,15 @@ async def list_operations(user: dict = Depends(get_current_user)):
     user_company = user.get("company_id")
     q = {}
     if user["role"] == "cedente":
+        or_clauses = [{"cedente_user_id": user["id"]}]
         if user_company:
-            q["cedente_company_id"] = user_company
-        else:
-            q["cedente_user_id"] = user["id"]
+            or_clauses.append({"cedente_company_id": user_company})
+        q["$or"] = or_clauses
     elif user["role"] == "reasegurador":
+        or_clauses = [{"reasegurador_user_id": user["id"]}]
         if user_company:
-            q["reasegurador_company_id"] = user_company
-        else:
-            q["reasegurador_user_id"] = user["id"]
+            or_clauses.append({"reasegurador_company_id": user_company})
+        q["$or"] = or_clauses
     elif user["role"] == "broker":
         q["broker_user_id"] = user["id"]
     elif user["role"] == "admin":
@@ -232,7 +232,7 @@ async def sign_nca(op_id: str, payload: NcaSignIn, request: Request, user: dict 
         or (user_role == "broker" and user_company and user_company == op.get("broker_company_id"))
     )
     if is_cedente:
-        filter_cond = {"id": op_id, "nca_signed_cedente": False}
+        filter_cond = {"id": op_id, "nca_signed_cedente": {"$ne": True}}
         update_fields = {
             "nca_signed_cedente": True,
             "nca_signed_at_cedente": now_iso(),
@@ -240,7 +240,7 @@ async def sign_nca(op_id: str, payload: NcaSignIn, request: Request, user: dict 
         }
         already_msg = "La cedente ya firmó el NCA"
     elif is_rea:
-        filter_cond = {"id": op_id, "nca_signed_reasegurador": False}
+        filter_cond = {"id": op_id, "nca_signed_reasegurador": {"$ne": True}}
         update_fields = {
             "nca_signed_reasegurador": True,
             "nca_signed_at_reasegurador": now_iso(),
@@ -248,7 +248,7 @@ async def sign_nca(op_id: str, payload: NcaSignIn, request: Request, user: dict 
         }
         already_msg = "El reasegurador ya firmó el NCA"
     elif is_broker_signer:
-        filter_cond = {"id": op_id, "nca_signed_broker": False}
+        filter_cond = {"id": op_id, "nca_signed_broker": {"$ne": True}}
         update_fields = {
             "nca_signed_broker": True,
             "nca_signed_at_broker": now_iso(),

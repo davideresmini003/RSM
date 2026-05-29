@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { api, API, formatApiError } from "../lib/api";
 import { useToast } from "../components/Toast";
 import { useAuth } from "../lib/auth";
@@ -14,8 +14,9 @@ export default function OperationDetail() {
   const { id } = useParams();
   const { user, company } = useAuth();
   const { t } = useI18n();
+  const location = useLocation();
   const [op, setOp] = useState(null);
-  const [tab, setTab] = useState(null);
+  const [tab, setTab] = useState(location.state?.tab ?? null);
   const [ncaModal, setNcaModal] = useState(false);
   const [contractModal, setContractModal] = useState(false);
   const [rateModal, setRateModal] = useState(false);
@@ -27,9 +28,9 @@ export default function OperationDetail() {
   const load = useCallback(
     () => api.get(`/operations/${id}`).then(({ data }) => {
       setOp(data.operation);
-      setTab((prev) => prev ?? (data.operation.state === "nca_pending" ? "chat" : "overview"));
+      setTab((prev) => prev ?? (location.state?.tab ?? (data.operation.state === "nca_pending" ? "chat" : "overview")));
     }),
-    [id]
+    [id, location.state?.tab]
   );
   useEffect(() => { load(); }, [load]);
 
@@ -580,7 +581,13 @@ function ChatSection({ op, user }) {
           </div>
         )}
         {msgs.map((m) => {
-          const mine = m.sender_id === user.id;
+          const isCedenteUser = op.cedente_user_id === user.id || (user.company_id && user.company_id === op.cedente_company_id);
+          const isReaUser = op.reasegurador_user_id === user.id || (user.company_id && user.company_id === op.reasegurador_company_id);
+          const isBrokerUser = op.broker_user_id === user.id;
+          const mine = m.sender_id === user.id ||
+            (m.sender_role === "cedente" && isCedenteUser) ||
+            (m.sender_role === "reasegurador" && isReaUser) ||
+            (m.sender_role === "broker" && isBrokerUser);
           const label = (() => {
             if (preNca) {
               if (m.sender_role === "cedente") return "Cedente Anónimo 🔒";

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import { useNotifications } from "../lib/notifications";
-import { LayoutDashboard, Briefcase, Store, FileText, ClipboardList, ShieldCheck, UserCircle2, LogOut, Languages } from "lucide-react";
+import { LayoutDashboard, Briefcase, Store, FileText, ClipboardList, ShieldCheck, UserCircle2, LogOut, Languages, MessageSquare } from "lucide-react";
 
 function Badge({ count }) {
   if (!count) return null;
@@ -75,7 +75,7 @@ export function RoleSidebar({ open = false, onClose }) {
           <div className="overline mt-1">Reinsurance · Marketplace</div>
         </Link>
       </div>
-      <nav className="flex-1 py-4">
+      <nav className="flex-1 py-4 overflow-y-auto">
         {base.map(({ to, icon: Icon, label, exact, badge }) => {
           const active = exact ? loc.pathname === to : loc.pathname.startsWith(to);
           return (
@@ -93,6 +93,25 @@ export function RoleSidebar({ open = false, onClose }) {
             </Link>
           );
         })}
+        {notif.chat_ops && notif.chat_ops.length > 0 && role !== "admin" && (
+          <div className="mt-2 border-t border-[hsl(var(--border))] pt-2">
+            <div className="flex items-center gap-2 px-6 py-2">
+              <MessageSquare size={13} strokeWidth={1.5} className="text-slate-400" />
+              <span className="overline text-[10px] text-slate-400">Chats con mensajes</span>
+            </div>
+            {notif.chat_ops.slice(0, 5).map((o) => (
+              <Link
+                key={o.op_id}
+                to={`/app/operations/${o.op_id}`}
+                state={{ tab: "chat" }}
+                className="flex items-center gap-3 px-6 py-2 text-xs font-medium border-l-2 border-transparent text-slate-600 hover:text-[#0B132B] hover:bg-slate-50 transition-colors"
+              >
+                <span className="truncate flex-1 font-mono-data">{o.op_code || o.op_id.slice(0, 8)}</span>
+                <Badge count={o.count} />
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
       <div className="border-t border-[hsl(var(--border))] p-4 space-y-3">
         <div className="flex items-center gap-2 text-xs">
